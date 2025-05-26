@@ -1,0 +1,48 @@
+{
+  "language": "Français",
+  "p": {
+    "home": {},
+    "notfound": {
+      "title": "Oups... cette page n'existe pas 🕵️‍♂️",
+      "description": "La page que vous cherchez n'existe pas ou a été supprimée.",
+      "back": "Retour à l'accueil"
+    }
+  },
+  "c": {
+    "md": {},
+    "ux": {
+      "nav": {
+        "home": "Accueil"
+      },
+      "errorBoundary": {
+        "title": "💥 Une erreur est survenue",
+        "retry": "🔄 Recharger la page",
+        "defaultMessage": "Une erreur inconnue est survenue."
+      }
+    }
+  },
+  "common": {
+    "back": "Retour",
+    "loading": "Chargement...",
+    "copied": "{{thing}} copié dans le presse-papiers",
+    "error": "Une erreur est survenue",
+    "status": {
+      "online": "Vous êtes en ligne",
+      "offline": "Vous êtes hors ligne"
+    },
+    "month": {
+      "january": "Janvier",
+      "february": "Février",
+      "march": "Mars",
+      "april": "Avril",
+      "may": "Mai",
+      "june": "Juin",
+      "july": "Juillet",
+      "august": "Août",
+      "september": "Septembre",
+      "october": "Octobre",
+      "november": "Novembre",
+      "december": "Décembre"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "language": "English",
+  "p": {
+    "home": {},
+    "notfound": {
+      "title": "Oops... this page doesn't exist 🕵️‍♂️",
+      "description": "The page you're looking for doesn't exist or has been deleted.",
+      "back": "Return to homepage"
+    }
+  },
+  "c": {
+    "md": {},
+    "ux": {
+      "nav": {
+        "home": "Home"
+      },
+      "errorBoundary": {
+        "title": "💥 An error occurred",
+        "retry": "🔄 Reload page",
+        "defaultMessage": "An unknown error occurred."
+      }
+    }
+  },
+  "common": {
+    "back": "Back",
+    "loading": "Loading...",
+    "copied": "{{thing}} copied to clipboard",
+    "error": "An error occurred",
+    "status": {
+      "online": "You are online",
+      "offline": "You are offline"
+    },
+    "month": {
+      "january": "January",
+      "february": "February",
+      "march": "March",
+      "april": "April",
+      "may": "May",
+      "june": "June",
+      "july": "July",
+      "august": "August",
+      "september": "September",
+      "october": "October",
+      "november": "November",
+      "december": "December"
+    }
+  }
+}

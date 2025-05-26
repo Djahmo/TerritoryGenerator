@@ -1,0 +1,22 @@
+{
+  "name": "territorygenerator",
+  "private": false,
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "workspaces": [
+    "apps/frontend",
+    "apps/backend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=frontend run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "turbo": "^2.5.3",
+    "typescript": "^5.8.3"
+  }
+}
