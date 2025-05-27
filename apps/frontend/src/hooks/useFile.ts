@@ -1,7 +1,5 @@
 import { useState, useCallback } from "react"
-
-type Coord = { lat: number; lon: number }
-type Territoire = { nom: string; polygon: Coord[] }
+import { Territory } from "%/types"
 
 export const useFileReader = () => {
   const [content, setContent] = useState<string>("")
@@ -27,44 +25,70 @@ export const useFileReader = () => {
   return { content, type, error, readFile }
 }
 
-export const parse = (input: string, type: string): Territoire[] =>
+export const parse = (input: string, type: string): Territory[] =>
   type.toLowerCase().includes("gpx") || input.trim().startsWith("<gpx")
     ? parseGpx(input)
     : parseCsv(input)
 
-export const parseCsv = (csv: string): Territoire[] => {
+export const parseCsv = (csv: string): Territory[] => {
   const lines = csv.split('\n')
     .filter(l => l.includes('['))
     .filter(line => !line.trim().startsWith('"['));
 
   return lines.map(line => {
-    const coords = [...line.matchAll(/\[([0-9.\-]+),([0-9.\-]+)\]/g)]
+    const polygon = [...line.matchAll(/\[([0-9.\-]+),([0-9.\-]+)\]/g)]
       .map(match => ({
         lat: parseFloat(match[2]),
         lon: parseFloat(match[1]),
       }));
-    if (!coords.length) return null;
+    if (!polygon.length) return null;
     const parts = line.split(',')
-    let nom = (parts[4] || '') + (parts[3] || '') || 'Territoire'
-    nom = nom.replace(/ï¿½/g, 'è').trim()
+    let num = (parts[4] || '') + (parts[3] || '') || 'Territoire'
+    let name = parts[2] || ''
+    name = name.replace(/ï¿½/g, 'è').trim()
 
-    return { nom, polygon: coords }
-  }).filter(Boolean) as Territoire[]
+    return { num, polygon, name, isDefault: true }
+  }).filter(Boolean) as Territory[]
 }
 
-export const parseGpx = (xml: string): Territoire[] => {
+export const parseGpx = (xml: string): Territory[] => {
   const parser = new DOMParser()
   const doc = parser.parseFromString(xml, "application/xml")
   const trks = Array.from(doc.getElementsByTagName("trk"))
 
   return trks.map(trk => {
     const nameEl = trk.getElementsByTagName("name")[0]
-    const nom = nameEl?.textContent?.trim() || "Territoire"
+    const numName = nameEl?.textContent?.trim() || "A00 - Territoire"
+    const num = numName.split(' - ')[0].trim()
+    const name = numName.split(' - ')[1]?.trim()
     const trkpts = Array.from(trk.getElementsByTagName("trkpt"))
     const polygon = trkpts.map(pt => ({
       lat: parseFloat(pt.getAttribute("lat") || "0"),
       lon: parseFloat(pt.getAttribute("lon") || "0"),
     }))
-    return { nom, polygon }
+    return { num, polygon, name, isDefault: true }
   }).filter(t => t.polygon.length > 0)
+}
+
+export const makeGpx = (territorys: Territory[]) => {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="territory.djahmo.fr" xmlns="http://www.topografix.com/GPX/1/1">
+${territorys.map(t => `  <trk>
+    <name>${t.num} - ${t.name}</name>
+    <trkseg>
+${t.polygon.map((p: any) => `      <trkpt lat="${p.lat}" lon="${p.lon}" />`).join('\n')}
+    </trkseg>
+  </trk>`).join('\n')}
+</gpx>`
+}
+
+export const handleGpxDownload = (territorys: Territory[]) => {
+  const gpx = makeGpx(territorys)
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'territoires.gpx'
+  a.click()
+  URL.revokeObjectURL(url)
 }
