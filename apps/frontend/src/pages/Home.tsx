@@ -17,14 +17,12 @@ const Home: FC = () => {
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
 
-  // Affiche le cache au chargement s'il existe
   useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
     }
   }, [cache])
 
-  // Génère les images et met à jour le cache si un nouveau fichier est uploadé
   useEffect(() => {
     (async () => {
       if (content && type) {
@@ -43,9 +41,11 @@ const Home: FC = () => {
     })()
   }, [content, type, generateImages])
 
-  // Bouton de reset pour les tests
-  // (optionnel, tu peux l'enlever)
-  // <button onClick={clearCache}>Reset Cache</button>
+  const handleRename = (num: string, name: string) => {
+    const updatedTerritorys = territorys.map(t => t.num === num ? { ...t, name } : t)
+    setTerritorys(updatedTerritorys)
+    updateTerritories(updatedTerritorys)
+  }
 
   return (
     <Wrapper className="mt-4 px-4 flex flex-col items-center gap-6 overflow-y-auto h-full">
@@ -74,6 +74,7 @@ const Home: FC = () => {
           .map((territory, i) => (
             <MapCard
               territory={territory}
+              onRename={handleRename}
               key={i}
               visible={!search ? true : `${territory.num} - ${territory.name}`.toLowerCase().includes(search.toLowerCase())}
             />

@@ -7,7 +7,7 @@ import { Link } from "react-router"
 
 type MapCardProps = {
   territory: Territory
-  onRename?: (num: string, nom: string) => void
+  onRename?: (num:string, name: string) => void
   visible?: boolean
 }
 
@@ -16,14 +16,13 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
   const { num, miniature, name, isDefault } = territory
 
   const [editMode, setEditMode] = useState(false)
-  const [inputNum, setInputNum] = useState(num)
   const [inputName, setInputNom] = useState(name || "")
 
   if (!miniature) return null
 
   const handleValidate = () => {
     setEditMode(false)
-    if (onRename) onRename(inputNum, inputName)
+    if (onRename) onRename(num, inputName)
   }
 
   return (
@@ -35,22 +34,15 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
           onClick={() => setEditMode(true)}
           title={t("home.rename_territory", "Renommer le territoire")}
         >
-          {inputNum} - {inputName}
+          <span className="border-r pr-1 mr-1">{num}</span>{inputName}
         </span>
       ) : (
         <div className="absolute top-3 left-3 w-[calc(100%-1.5rem)] flex items-center bg-positive rounded-full px-2 py-1 z-10 shadow gap-2">
-          <input
-            value={inputNum}
-            onChange={e => setInputNum(e.target.value)}
-            className="w-12 px-1 text-xs text-white font-bold outline-0"
-            placeholder={t("home.num_placeholder", "Numéro")}
-            onKeyDown={e => e.key === "Enter" && handleValidate()}
-            />
-          <span className="mx-1 -mt-1 text-white text-lg font-extralight select-none">-</span>
+          <span className="pr-2 ml-1 text-white text-lg font-extralight cursor-default border-r">{num}</span>
           <input
             value={inputName}
             onChange={e => setInputNom(e.target.value)}
-            className="flex-1 px-1 text-xs text-white font-bold outline-0"
+            className="flex-1 px-1 text-white font-bold outline-0"
             placeholder={t("home.nom_placeholder", "Nom")}
             onKeyDown={e => e.key === "Enter" && handleValidate()}
             autoFocus
@@ -64,7 +56,7 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
       <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">
         <img
           src={miniature}
-          alt={`Territoire ${inputNum}`}
+          alt={`Territoire ${num}`}
           className={`object-contain w-full h-full transition-opacity duration-300 `}
         />
         <Loader enabled={isDefault} />

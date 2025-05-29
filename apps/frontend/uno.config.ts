@@ -59,11 +59,14 @@ export default defineConfig({
   },
   shortcuts: [
     ['btn', 'inline-flex items-center justify-center px-4 py-2 rounded-sm transition-colors text-sm font-medium cursor-pointer transition duration-200 ease-in-out'],
+    ['btn-sm', 'inline-flex items-center justify-center p-2 w-fit aspect-square rounded-sm transition-colors cursor-pointer transition duration-200 ease-in-out'],
     ['ctrlbtn', 'btn flex-1 rounded-none enabled:(hover:bg-muted/10 active:bg-muted/20) disabled:(text-muted/40 cursor-default)'],
     ['btn-positive', 'btn bg-positive text-white hover:bg-positive-hover active:bg-positive disabled:bg-positive-disabled'],
     ['btn-accent', 'btn bg-accent text-white hover:bg-accent-hover active:bg-accent disabled:bg-accent-disabled'],
     ['btn-success', 'btn bg-success text-black hover:bg-success-hover active:bg-success disabled:bg-success-disabled'],
     ['btn-neutral', 'btn bg-neutral text-white hover:bg-neutral-hover active:bg-neutral disabled:bg-neutral-disabled'],
     ['btn-negative', 'btn bg-negative text-white hover:bg-negative-hover active:bg-negative-active disabled:bg-negative-disabled'],
+    ['btn-unselected', 'btn-sm border border-muted/50 bg-transparent text-positive hover:bg-muted/10'],
+    ['btn-selected', 'btn-sm border border-positive/50 bg-positive/20 text-positive hover:bg-muted/10'],
   ],
 })

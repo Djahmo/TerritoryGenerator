@@ -21,7 +21,7 @@ const PopoverContent = React.forwardRef<
         sideOffset={sideOffset}
         onOpenAutoFocus={() => setOpen(true)}
         onCloseAutoFocus={() => setOpen(false)}
-        className={`z-50 w-72 rounded-md border bg-lightnd dark:bg-darknd p-4 shadow-md outline-0 origin-[--radix-popover-content-transform-origin] ${className}`}
+        className={`z-50 w-72 rounded-md border bg-lightnd p-4 shadow-md outline-0 origin-[--radix-popover-content-transform-origin] ${className}`}
         style={{
           opacity: open ? 1 : 0,
           transform: `

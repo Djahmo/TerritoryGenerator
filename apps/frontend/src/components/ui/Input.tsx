@@ -7,17 +7,21 @@ interface InputProps {
   label?: string;
   name?: string;
   placeholder: string;
+  min?: number;
+  max?: number;
   type: string;
   value: string;
   className?: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: () => void;
+  onWheel?: (e: React.WheelEvent<HTMLInputElement>) => void;
   disabled?: boolean;
   autocomplete?: string;
   verified?: boolean;
   Icon?: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
 }
 
-const Input = ({ label, name, placeholder, className, type, value, onChange, disabled, autocomplete, verified, Icon }: InputProps) => {
+const Input = ({ label, name, placeholder, className, min, max, type, value, onChange, onBlur, onWheel, disabled, autocomplete, verified, Icon }: InputProps) => {
 
   const { t } = useTranslation();
 
@@ -79,12 +83,13 @@ const Input = ({ label, name, placeholder, className, type, value, onChange, dis
     setVisibleCondition(true);
   }
   const handleBlur = () => {
+    onBlur?.()
     if (type !== "password" || !verified)
       setVisibleCondition(false);
   }
 
   return (
-    <div className={`flex flex-col mb-4 ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       {label && <label className="mb-2 text-sm font-medium">{label}</label>}
       <div className={`border-b relative ${conditions.length > 0 && "mb-2"} ${visibleCondition ? " border-positive" : "border-positive/50"} `}>
         {!!Icon && <Icon size={20} className="absolute ml-2 mt-2 text-positive" />}
@@ -96,9 +101,12 @@ const Input = ({ label, name, placeholder, className, type, value, onChange, dis
           onFocus={handleFocus}
           onBlur={handleBlur}
           onChange={onChange}
+          onWheel={onWheel}
           disabled={disabled}
           autoComplete={autocomplete}
           className={"w-full p-2 pb-1 outline-0" + (Icon ? " pl-10" : "")}
+          min={type === "number" ? min : undefined}
+          max={type === "number" ? max : undefined}
         />
         {type === "password" && (
           <button
