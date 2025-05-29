@@ -312,7 +312,7 @@ const Paint: React.FC<PaintProps> = ({ src }) => {
 
     // Utilisation de la factory function pour créer l'outil
     const newShape = createToolShape(selectedTool, colorToUse, strokeWidth, fontSize, point);
-    
+
     if (selectedTool === 'parking') {
       // Cas spécial pour le parking - ajout immédiat aux objets
       if (newShape) {
@@ -506,10 +506,55 @@ const Paint: React.FC<PaintProps> = ({ src }) => {
   const handleUndo = useCallback(() => {
     handleHistoryChange(undo());
   }, [handleHistoryChange, undo]);
-
   const handleRedo = useCallback(() => {
     handleHistoryChange(redo());
   }, [handleHistoryChange, redo]);
+
+  // Gestion des raccourcis clavier
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore si l'utilisateur tape dans un input text
+      if (showTextInput) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 'z':
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Ctrl+Shift+Z = Redo (alternative)
+              if (canRedo) handleRedo();
+            } else {
+              // Ctrl+Z = Undo
+              if (canUndo) handleUndo();
+            }
+            break;
+          case 'y':
+            // Ctrl+Y = Redo
+            e.preventDefault();
+            if (canRedo) handleRedo();
+            break;
+        }
+      }
+
+      // Échapper pour désélectionner
+      if (e.key === 'Escape') {
+        setSelectedObjects([]);
+        setSelectedTool('selection');
+      }
+
+      // Supprimer les objets sélectionnés
+      if (e.key === 'Delete' && selectedObjects.length > 0) {
+        handleClear();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTextInput, canUndo, canRedo, handleUndo, handleRedo, selectedObjects, handleClear, setSelectedObjects, setSelectedTool]);
+
   return (
     <div className="flex w-full h-full min-w-0">
       <div className="flex-1 flex flex-col relative min-w-0">
@@ -547,7 +592,7 @@ const Paint: React.FC<PaintProps> = ({ src }) => {
         </div>
       </div>
 
-      <div className="w-64 min-w-64 p-4 flex flex-col justify-between flex-shrink-0">
+      <div className="w-50 min-w-50 p-4 flex flex-col justify-between flex-shrink-0">
         <div className='space-y-4'>
           <ToolBar
             tools={TOOLS}

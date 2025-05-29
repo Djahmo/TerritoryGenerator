@@ -172,7 +172,7 @@ export const getLogicalCoordsOptimized = (
   transformParams: CanvasTransformParams
 ): [number, number] => {
   if (!canvasRef.current) return [0, 0];
-  
+
   const worldPoint = mouseToWorld(e.clientX, e.clientY, canvasRef.current, transformParams);
   return [worldPoint.x, worldPoint.y];
 };

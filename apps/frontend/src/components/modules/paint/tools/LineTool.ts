@@ -4,7 +4,7 @@ import { createBaseShapeWithCoords, updateEndCoordinates, withCanvasContext, con
 export class LineTool {  static draw(ctx: CanvasRenderingContext2D, line: DrawLine): void {
     withCanvasContext(ctx, (ctx) => {
       configureStrokeStyle(ctx, line.color, line.strokeWidth);
-      
+
       ctx.beginPath();
       ctx.moveTo(line.startX, line.startY);
       ctx.lineTo(line.endX, line.endY);
