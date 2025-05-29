@@ -607,7 +607,8 @@ const Paint: React.FC<PaintProps> = ({ src }) => {
             onColorChange={setSelectedColor}
             secondaryColor={secondaryColor}
             onSecondaryColorChange={setSecondaryColor}
-          />          <SeparatorX />
+          />
+          <SeparatorX />
 
           {selectedTool === 'text' ? (
             <NumericInput
