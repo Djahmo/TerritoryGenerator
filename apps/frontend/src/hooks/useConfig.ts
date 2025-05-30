@@ -10,19 +10,19 @@ export type Config = {
   ratioX: number
   ratioY: number
   palette: string[]
-  
+
   // Configuration de génération d'images
   contourColor: string
   contourWidth: number
-  
+
   // Configuration des miniatures
   thumbnailWidth: number
-  
+
   // Configuration réseau
   networkRetries: number
   networkDelay: number
   ignApiRateLimit: number
-  
+
   // Configuration API IGN
   ignApiBaseUrl: string
   ignApiLayer: string
@@ -40,19 +40,19 @@ const defaultConfig: Config = {
     "rgba(0,0,0,1)", "rgba(50,75,95,1)", "rgba(0,174,239,1)", "rgba(0,128,0,1)",
     "rgba(255,0,0,1)", "rgba(255,165,0,1)", "rgba(255,255,0,1)",
   ],
-  
+
   // Configuration de génération d'images
   contourColor: 'red',
   contourWidth: 8,
-  
+
   // Configuration des miniatures
   thumbnailWidth: 500,
-  
+
   // Configuration réseau
   networkRetries: 3,
   networkDelay: 1000,
   ignApiRateLimit: 40, // 40ms entre chaque requête vers l'API IGN pour plus de sécurité
-  
+
   // Configuration API IGN
   ignApiBaseUrl: 'https://data.geopf.fr/wms-r',
   ignApiLayer: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',

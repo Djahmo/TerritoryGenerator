@@ -86,3 +86,19 @@ export type TerritoryCache = {
   gpx: string
   lastUpdate: number
 }
+
+/**
+ * Résultat de génération d'image
+ */
+export interface GeneratedImage {
+  miniature: string
+  image: string
+}
+
+/**
+ * Configuration pour la génération d'images
+ */
+export interface ImageGenerationConfig {
+  contourColor?: string
+  contourWidth?: number
+}

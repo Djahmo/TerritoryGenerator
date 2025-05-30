@@ -15,10 +15,7 @@ import {
 } from '../utils/canvas'
 import { loadImageBitmap, buildIgnUrl } from './networkService'
 import { createThumbnail } from './thumbnailService'
-import {
-  type ImageGenerationConfig,
-  type GeneratedImage
-} from '../utils/constants'
+import { type GeneratedImage, type ImageGenerationConfig } from '../utils/types'
 
 /**
  * Service principal pour la génération d'images de territoires
@@ -52,10 +49,10 @@ export class TerritoryImageService {
     territory: Territory,
     options: ImageGenerationConfig = {}
   ): Promise<GeneratedImage> {
-    const { contourColor, contourWidth } = { 
-      contourColor: this.userConfig.contourColor, 
-      contourWidth: this.userConfig.contourWidth, 
-      ...options 
+    const { contourColor, contourWidth } = {
+      contourColor: this.userConfig.contourColor,
+      contourWidth: this.userConfig.contourWidth,
+      ...options
     }
 
     // 1. Calcul de la bounding box
@@ -67,8 +64,8 @@ export class TerritoryImageService {
       crs: this.userConfig.ignApiCRS
     })
     const mapImage = await loadImageBitmap(
-      url, 
-      this.userConfig.networkRetries, 
+      url,
+      this.userConfig.networkRetries,
       this.userConfig.networkDelay
     )
 
@@ -127,10 +124,10 @@ export class TerritoryImageService {
     territory: Territory,
     options: ImageGenerationConfig = {}
   ): Promise<string> {
-    const { contourColor, contourWidth } = { 
-      contourColor: this.userConfig.contourColor, 
-      contourWidth: this.userConfig.contourWidth, 
-      ...options 
+    const { contourColor, contourWidth } = {
+      contourColor: this.userConfig.contourColor,
+      contourWidth: this.userConfig.contourWidth,
+      ...options
     }
 
     // 1. Calcul de la bounding box pour plan large
@@ -142,8 +139,8 @@ export class TerritoryImageService {
       crs: this.userConfig.ignApiCRS
     })
     const mapImage = await loadImageBitmap(
-      url, 
-      this.userConfig.networkRetries, 
+      url,
+      this.userConfig.networkRetries,
       this.userConfig.networkDelay
     )
 

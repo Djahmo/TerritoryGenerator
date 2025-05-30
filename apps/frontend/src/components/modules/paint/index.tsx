@@ -21,9 +21,12 @@ interface PaintProps {
   src?: string;
   layers?: PaintLayer[];
   onSave?: (layers: PaintLayer[], compositeImage?: string) => void;
+  isLarge?: boolean;
 }
 
-const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
+const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) => {
+  // Note: isLarge parameter is available for future use (e.g., different UI behaviors for large view)
+  void isLarge; // Prevent unused variable warning
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
@@ -87,21 +90,35 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
     dragOffset,
     setDragOffset
   } = useDrawingState();  const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
-  const [layersLoaded, setLayersLoaded] = useState<boolean>(false);
-  // Effet pour charger les layers existants
-  useEffect(() => {
-    if (layers && layers.length > 0 && !layersLoaded) {
+  const [currentMode, setCurrentMode] = useState<{ isLarge: boolean; layersLoaded: boolean }>({
+    isLarge: false,
+    layersLoaded: false
+  });
+    // Effet pour charger les layers existants
+  useEffect(() => {    // Reset layers when switching between normal/large modes
+    if (currentMode.isLarge !== isLarge) {
+      setCurrentMode({ isLarge, layersLoaded: false });
+      setObjects([]);
+      // Ne pas faire de return ici - continuer pour charger les layers du nouveau mode
+    }// Load layers if they exist and haven't been loaded for current mode OR if mode just changed
+    const shouldLoadLayers = layers && layers.length > 0 &&
+      (!currentMode.layersLoaded || currentMode.isLarge !== isLarge);
+      if (shouldLoadLayers) {
       const drawObjects = layers
         .map(LayerService.convertLayerToDrawObject)
         .filter((obj): obj is DrawObject => obj !== null);
 
       setObjects(drawObjects);
       addToHistory(drawObjects);
-      setLayersLoaded(true);
-    } else if (!layers || layers.length === 0) {
-      setLayersLoaded(false);
+      setCurrentMode({ isLarge, layersLoaded: true });    } else if (!layers || layers.length === 0) {
+      setCurrentMode({ isLarge, layersLoaded: false });
+      // Ne pas effacer les objets existants si l'utilisateur a déjà dessiné
+      // Seulement les effacer si nous n'avons pas d'objets actuels
+      if (objects.length === 0) {
+        setObjects([]);
+      }
     }
-  }, [layers, setObjects, addToHistory, layersLoaded]);
+  }, [layers, setObjects, addToHistory, isLarge]);
 
   // Image loading effect
   useEffect(() => {
@@ -405,10 +422,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
     if (selectedTool === 'selection' && currentShape.type === 'selection') {
       const selectedObjs = SelectionTool.getSelectedObjects(currentShape, objects);
       const selectedIndices = selectedObjs.map(obj => objects.indexOf(obj)).filter(index => index !== -1);
-      setSelectedObjects(selectedIndices);
-    } else if (selectedTool === 'text' && currentShape.type === 'text') {
-      return;
-    } else {
+      setSelectedObjects(selectedIndices);    } else if (selectedTool === 'text' && currentShape.type === 'text') {
+      return;    } else {
       const newObjects = [...objects, currentShape];
       setObjects(newObjects);
       addToHistory(newObjects);
@@ -529,8 +544,10 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
         // Pas d'image de base, utiliser les dimensions du canvas
         tempCanvas.width = canvasDims.w;
         tempCanvas.height = canvasDims.h;
-      }      // Dessiner tous les objets sur le canvas temporaire en utilisant les outils existants
-      objects.forEach(obj => {
+      }
+
+      // Dessiner tous les objets sur le canvas temporaire en utilisant les outils existants
+      objects.forEach((obj) => {
         if (obj.type === 'selection') return; // Ignorer les sélections
         drawToolShape(tempCtx, obj);
       });
@@ -541,7 +558,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
       // Passer les layers ET l'image composite
       onSave(paintLayers, compositeImage);
     } catch (error) {
-      console.error('Error exporting canvas:', error);
+      console.error('[Paint] Error exporting canvas:', error);
       // En cas d'erreur, sauvegarder au moins les layers
       const paintLayers = objects
         .map(LayerService.convertDrawObjectToLayer)

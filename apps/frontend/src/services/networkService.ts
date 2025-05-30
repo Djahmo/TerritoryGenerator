@@ -28,8 +28,8 @@ export const fetchWithRetry = async (
  * Charge une image directement (sans queue - gestion du délai au niveau supérieur)
  */
 export const loadImageBitmap = async (
-  url: string, 
-  retries = 3, 
+  url: string,
+  retries = 3,
   delay = 1000
 ): Promise<ImageBitmap> => {
   const response = await fetchWithRetry(url, retries, delay)
@@ -51,7 +51,7 @@ export const buildIgnUrl = (
   } = {}
 ): string => {
   const [minLon, minLat, maxLon, maxLat] = bbox
-  
+
   const {
     baseUrl = 'https://data.geopf.fr/wms-r',
     layer = 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
