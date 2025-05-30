@@ -1,5 +1,4 @@
 import { setCanvasQuality } from '../utils/canvas'
-import { THUMBNAIL_CONFIG } from '../utils/constants'
 
 /**
  * Crée une miniature à partir d'une image source
@@ -56,10 +55,8 @@ const processImageToThumbnail = (
     img,
     sx, sy, sWidth, sHeight,
     0, 0, cropWidth, cropHeight
-  )
-
-  // Deuxième canvas : redimensionnement final pour la miniature
-  const finalWidth = THUMBNAIL_CONFIG.FINAL_WIDTH
+  )  // Deuxième canvas : redimensionnement final pour la miniature
+  const finalWidth = cropWidth // Utilise directement la largeur demandée
   const finalHeight = Math.round((cropHeight / cropWidth) * finalWidth)
 
   const smallCanvas = document.createElement("canvas")

@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { create } from "zustand"
 import { get as idbGet, set as idbSet, del as idbDel } from "idb-keyval"
-import type { Territory, TerritoryCache } from "%/types"
+import type { Territory, TerritoryCache, PaintLayer } from "%/types"
 
 const CACHE_KEY = "territory_cache_v1"
 
@@ -11,6 +11,8 @@ type State = {
   setCache: (cache: TerritoryCache | null) => void
   updateTerritories: (territories: Territory[]) => void
   updateGpx: (gpx: string) => void
+  updateTerritoryLayers: (num: string, layers: PaintLayer[], isLarge?: boolean) => void
+  updateTerritory: (num: string, updates: Partial<Territory>) => void
   clearCache: () => void
   initialize: () => Promise<void>
 }
@@ -18,13 +20,15 @@ type State = {
 export const useTerritoryStore = create<State>((set, get) => ({
   cache: null,
   loading: true,
-
   setCache: (cache) => {
     set({ cache })
-    if (cache) idbSet(CACHE_KEY, cache)
-    else idbDel(CACHE_KEY)
+    try {
+      if (cache) idbSet(CACHE_KEY, cache)
+      else idbDel(CACHE_KEY)
+    } catch (error) {
+      console.warn('Erreur lors de la sauvegarde du cache:', error)
+    }
   },
-
   updateTerritories: (territories) => {
     const prev = get().cache
     const newCache: TerritoryCache = {
@@ -34,10 +38,12 @@ export const useTerritoryStore = create<State>((set, get) => ({
       gpx: prev?.gpx || "",
     }
     set({ cache: newCache })
-    idbSet(CACHE_KEY, newCache)
-  },
-
-  updateGpx: (gpx) => {
+    try {
+      idbSet(CACHE_KEY, newCache)
+    } catch (error) {
+      console.warn('Erreur lors de la sauvegarde des territoires:', error)
+    }
+  },  updateGpx: (gpx) => {
     const prev = get().cache
     const newCache: TerritoryCache = {
       ...(prev || {}),
@@ -46,24 +52,109 @@ export const useTerritoryStore = create<State>((set, get) => ({
       territories: prev?.territories || [],
     }
     set({ cache: newCache })
-    idbSet(CACHE_KEY, newCache)
+    try {
+      idbSet(CACHE_KEY, newCache)
+    } catch (error) {
+      console.warn('Erreur lors de la sauvegarde du GPX:', error)
+    }
   },
+  updateTerritoryLayers: (num: string, layers: PaintLayer[], isLarge: boolean = false) => {
+    const prev = get().cache
+    if (!prev) return
 
+    const updatedTerritories = prev.territories.map(territory => {
+      if (territory.num === num) {
+        return {
+          ...territory,
+          ...(isLarge
+            ? { paintLayersLarge: layers }
+            : { paintLayersImage: layers }
+          )
+        }
+      }
+      return territory
+    })
+
+    const newCache: TerritoryCache = {
+      ...prev,
+      territories: updatedTerritories,
+      lastUpdate: Date.now()
+    }
+    set({ cache: newCache })
+    try {
+      idbSet(CACHE_KEY, newCache)
+    } catch (error) {
+      console.warn('Erreur lors de la sauvegarde des layers:', error)
+    }
+  },
+  updateTerritory: (num: string, updates: Partial<Territory>) => {
+    const prev = get().cache
+    if (!prev) {
+      console.warn('updateTerritory: Cache non disponible')
+      return
+    }
+
+    console.log('updateTerritory:', num, updates)
+
+    const updatedTerritories = prev.territories.map(territory => {
+      if (territory.num === num) {
+        const updatedTerritory = { ...territory, ...updates }
+        console.log('Territoire mis à jour:', updatedTerritory)
+        return updatedTerritory
+      }
+      return territory
+    })
+
+    const newCache: TerritoryCache = {
+      ...prev,
+      territories: updatedTerritories,
+      lastUpdate: Date.now()
+    }
+
+    console.log('Nouveau cache:', newCache)
+    set({ cache: newCache })
+
+    try {
+      idbSet(CACHE_KEY, newCache)
+      console.log('Cache sauvegardé en IndexedDB')
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du territoire:', error)
+    }
+  },
   clearCache: () => {
     set({ cache: null })
-    idbDel(CACHE_KEY)
+    try {
+      idbDel(CACHE_KEY)
+    } catch (error) {
+      console.warn('Erreur lors de la suppression du cache:', error)
+    }
   },
-
   initialize: async () => {
     set({ loading: true })
-    const data = await idbGet<TerritoryCache>(CACHE_KEY)
-    if (data) set({ cache: data })
+    try {
+      const data = await idbGet<TerritoryCache>(CACHE_KEY)
+      if (data) set({ cache: data })
+    } catch (error) {
+      console.warn('Erreur lors du chargement du cache:', error)
+      // En cas d'erreur, on repart avec un cache vide
+      set({ cache: null })
+    }
     set({ loading: false })
   }
 }))
 
 export const useTerritoryCache = () => {
-  const { cache, loading, setCache, updateTerritories, updateGpx, clearCache, initialize } = useTerritoryStore()
+  const {
+    cache,
+    loading,
+    setCache,
+    updateTerritories,
+    updateGpx,
+    updateTerritoryLayers,
+    updateTerritory,
+    clearCache,
+    initialize
+  } = useTerritoryStore()
 
   useEffect(() => {
     if (loading) initialize()
@@ -75,6 +166,8 @@ export const useTerritoryCache = () => {
     setCache,
     updateTerritories,
     updateGpx,
+    updateTerritoryLayers,
+    updateTerritory,
     clearCache
   }
 }

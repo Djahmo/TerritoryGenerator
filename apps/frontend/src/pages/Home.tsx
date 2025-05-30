@@ -13,11 +13,12 @@ const Home: FC = () => {
   const { t } = useTranslation()
   const { content, type, error: fileError, readFile } = useFileReader()
   const { loading, error: imgError, generateImages } = useGenerate()
-  const { cache, loading: cacheLoading, updateGpx, updateTerritories } = useTerritoryCache()
+  const { cache, updateGpx, updateTerritories } = useTerritoryCache()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
 
   useEffect(() => {
+    console.log("Cache loaded:", cache)
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
     }
@@ -51,7 +52,7 @@ const Home: FC = () => {
     <Wrapper className="mt-4 px-4 flex flex-col items-center gap-6 overflow-y-auto h-full">
       <h1 className="text-3xl font-bold">{t("home.upload_title", "Charger un fichier territoire")}</h1>
 
-      {!territorys.length && !cacheLoading && <FileUpload onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')} loading={loading} />}
+      {!territorys.length && <FileUpload onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')} loading={loading} />}
 
       {fileError && <div className="text-red-500">{fileError}</div>}
       {imgError && <div className="text-red-500">{imgError}</div>}

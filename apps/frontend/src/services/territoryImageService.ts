@@ -17,9 +17,7 @@ import { loadImageBitmap, buildIgnUrl } from './networkService'
 import { createThumbnail } from './thumbnailService'
 import {
   type ImageGenerationConfig,
-  type GeneratedImage,
-  DEFAULT_CONFIG,
-  THUMBNAIL_CONFIG
+  type GeneratedImage
 } from '../utils/constants'
 
 /**
@@ -33,24 +31,46 @@ export class TerritoryImageService {
       finalHeight: number
       rawSize: number
     },
-    private PHI: number
+    private PHI: number,
+    private userConfig: {
+      contourColor: string
+      contourWidth: number
+      thumbnailWidth: number
+      ignApiBaseUrl: string
+      ignApiLayer: string
+      ignApiFormat: string
+      ignApiCRS: string
+      networkRetries: number
+      networkDelay: number
+      ignApiRateLimit: number
+    }
   ) {}
 
   /**
    * Génère une image normale (avec optimisation d'orientation)
-   */
-  async generateStandardImage(
+   */  async generateStandardImage(
     territory: Territory,
     options: ImageGenerationConfig = {}
   ): Promise<GeneratedImage> {
-    const { contourColor, contourWidth } = { ...DEFAULT_CONFIG, ...options }
+    const { contourColor, contourWidth } = { 
+      contourColor: this.userConfig.contourColor, 
+      contourWidth: this.userConfig.contourWidth, 
+      ...options 
+    }
 
     // 1. Calcul de la bounding box
-    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)
-
-    // 2. Chargement de l'image de la carte
-    const url = buildIgnUrl(bbox, this.dimensions.rawSize)
-    const mapImage = await loadImageBitmap(url)
+    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)    // 2. Chargement de l'image de la carte
+    const url = buildIgnUrl(bbox, this.dimensions.rawSize, {
+      baseUrl: this.userConfig.ignApiBaseUrl,
+      layer: this.userConfig.ignApiLayer,
+      format: this.userConfig.ignApiFormat,
+      crs: this.userConfig.ignApiCRS
+    })
+    const mapImage = await loadImageBitmap(
+      url, 
+      this.userConfig.networkRetries, 
+      this.userConfig.networkDelay
+    )
 
     // 3. Conversion du polygone en pixels
     const polygonPixels = territory.polygon.map(coord =>
@@ -92,34 +112,40 @@ export class TerritoryImageService {
     drawMask(ctx, finalPolygon, this.dimensions.finalWidth, this.dimensions.finalHeight, {
       planLarge: false
     })
-    drawContour(ctx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
-
-    // 10. Correction de l'orientation si nécessaire
-    const finalCanvas = flipCanvasIfNeeded(croppedCanvas, optimal.angle)
-
-    // 11. Génération de l'image et de la miniature
+    drawContour(ctx, finalPolygon, { color: contourColor, lineWidth: contourWidth })    // 10. Correction de l'orientation si nécessaire
+    const finalCanvas = flipCanvasIfNeeded(croppedCanvas, optimal.angle)    // 11. Génération de l'image et de la miniature
     const image = finalCanvas.toDataURL('image/png')
-    const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * THUMBNAIL_CONFIG.CROP_WIDTH)
-    const miniature = await createThumbnail(image, THUMBNAIL_CONFIG.CROP_WIDTH, minHeight)
+    const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * this.userConfig.thumbnailWidth)
+    const miniature = await createThumbnail(image, this.userConfig.thumbnailWidth, minHeight)
 
     return { image, miniature }
   }
 
   /**
    * Génère une image large (sans optimisation d'orientation)
-   */
-  async generateLargeImage(
+   */  async generateLargeImage(
     territory: Territory,
     options: ImageGenerationConfig = {}
   ): Promise<string> {
-    const { contourColor, contourWidth } = { ...DEFAULT_CONFIG, ...options }
+    const { contourColor, contourWidth } = { 
+      contourColor: this.userConfig.contourColor, 
+      contourWidth: this.userConfig.contourWidth, 
+      ...options 
+    }
 
     // 1. Calcul de la bounding box pour plan large
-    const bbox = calculateBoundingBox(territory.polygon, true, this.config, this.PHI)
-
-    // 2. Chargement de l'image
-    const url = buildIgnUrl(bbox, this.dimensions.rawSize)
-    const mapImage = await loadImageBitmap(url)
+    const bbox = calculateBoundingBox(territory.polygon, true, this.config, this.PHI)    // 2. Chargement de l'image
+    const url = buildIgnUrl(bbox, this.dimensions.rawSize, {
+      baseUrl: this.userConfig.ignApiBaseUrl,
+      layer: this.userConfig.ignApiLayer,
+      format: this.userConfig.ignApiFormat,
+      crs: this.userConfig.ignApiCRS
+    })
+    const mapImage = await loadImageBitmap(
+      url, 
+      this.userConfig.networkRetries, 
+      this.userConfig.networkDelay
+    )
 
     // 3. Création du canvas de base
     const canvas = document.createElement('canvas')
@@ -159,10 +185,9 @@ export class TerritoryImageService {
 
   /**
    * Génère une miniature à partir d'une image existante
-   */
-  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
-    const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * THUMBNAIL_CONFIG.CROP_WIDTH)
-    return await createThumbnail(imageDataUrl, THUMBNAIL_CONFIG.CROP_WIDTH, minHeight)
+   */  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
+    const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * this.userConfig.thumbnailWidth)
+    return await createThumbnail(imageDataUrl, this.userConfig.thumbnailWidth, minHeight)
   }
 
   /**

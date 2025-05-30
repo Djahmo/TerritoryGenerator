@@ -1,12 +1,10 @@
-import { NETWORK_CONFIG } from '../utils/constants'
-
 /**
  * Effectue une requête avec retry automatique en cas d'échec
  */
 export const fetchWithRetry = async (
   url: string,
-  retries = NETWORK_CONFIG.DEFAULT_RETRIES,
-  delay = NETWORK_CONFIG.DEFAULT_DELAY
+  retries = 3,
+  delay = 1000
 ): Promise<Response> => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -29,8 +27,12 @@ export const fetchWithRetry = async (
 /**
  * Charge une image directement (sans queue - gestion du délai au niveau supérieur)
  */
-export const loadImageBitmap = async (url: string): Promise<ImageBitmap> => {
-  const response = await fetchWithRetry(url)
+export const loadImageBitmap = async (
+  url: string, 
+  retries = 3, 
+  delay = 1000
+): Promise<ImageBitmap> => {
+  const response = await fetchWithRetry(url, retries, delay)
   const blob = await response.blob()
   return createImageBitmap(blob)
 }
@@ -41,9 +43,21 @@ export const loadImageBitmap = async (url: string): Promise<ImageBitmap> => {
 export const buildIgnUrl = (
   bbox: [number, number, number, number],
   size: number,
-  layer = 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'
+  options: {
+    baseUrl?: string
+    layer?: string
+    format?: string
+    crs?: string
+  } = {}
 ): string => {
   const [minLon, minLat, maxLon, maxLat] = bbox
+  
+  const {
+    baseUrl = 'https://data.geopf.fr/wms-r',
+    layer = 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+    format = 'image/png',
+    crs = 'EPSG:4326'
+  } = options
 
   const params = new URLSearchParams({
     SERVICE: 'WMS',
@@ -51,12 +65,12 @@ export const buildIgnUrl = (
     REQUEST: 'GetMap',
     LAYERS: layer,
     STYLES: '',
-    CRS: 'EPSG:4326',
+    CRS: crs,
     BBOX: `${minLat},${minLon},${maxLat},${maxLon}`,
     WIDTH: size.toString(),
     HEIGHT: size.toString(),
-    FORMAT: 'image/png'
+    FORMAT: format
   })
 
-  return `https://data.geopf.fr/wms-r?${params.toString()}`
+  return `${baseUrl}?${params.toString()}`
 }

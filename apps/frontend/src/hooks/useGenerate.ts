@@ -10,14 +10,24 @@ export const useGenerate = () => {
   const [pendingCount, setPendingCount] = useState(0)
   const defaultImageRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { config, finalWidth, finalHeight, rawSize, PHI } = useConfig()
-
-  // Mémorisation du service pour éviter les recréations
+  const { config, finalWidth, finalHeight, rawSize, PHI } = useConfig()  // Mémorisation du service pour éviter les recréations
   const imageService = useMemo(() =>
     new TerritoryImageService(
       config,
       { finalWidth, finalHeight, rawSize },
-      PHI
+      PHI,
+      {
+        contourColor: config.contourColor,
+        contourWidth: config.contourWidth,
+        thumbnailWidth: config.thumbnailWidth,
+        ignApiBaseUrl: config.ignApiBaseUrl,
+        ignApiLayer: config.ignApiLayer,
+        ignApiFormat: config.ignApiFormat,
+        ignApiCRS: config.ignApiCRS,
+        networkRetries: config.networkRetries,
+        networkDelay: config.networkDelay,
+        ignApiRateLimit: config.ignApiRateLimit
+      }
     ),
     [config, finalWidth, finalHeight, rawSize, PHI]
   )
@@ -63,13 +73,13 @@ export const useGenerate = () => {
     // Créer un nouveau AbortController pour cette génération
     abortControllerRef.current = new AbortController()
 
-    try {
-      // Initialisation avec l'image par défaut
+    try {      // Initialisation avec l'image par défaut
       const initialTerritories: Territory[] = territories.map(territory => ({
         ...territory,
         miniature: defaultImageRef.current!,
         image: '',
-        imagelarge: '',
+        original: '',
+        originalLarge: '',
         isDefault: true
       }))
 
@@ -78,7 +88,6 @@ export const useGenerate = () => {
       // Compteur pour suivre les images terminées
       let completedCount = 0
 
-      // Lancement de tous les téléchargements en parallèle avec délais pour respecter l'API IGN
       const promises = territories.map((territory, index) =>
         new Promise<void>((resolve) => {
           const timeoutId = setTimeout(async () => {
@@ -91,15 +100,13 @@ export const useGenerate = () => {
 
               const result = await imageService.generateStandardImage(territory)
 
-              // Vérifier à nouveau après l'appel async
               if (abortControllerRef.current?.signal.aborted) {
                 resolve()
                 return
               }
-
-              // Mise à jour du territoire correspondant
               const targetTerritory = initialTerritories.find(t => t.num === territory.num)
               if (targetTerritory) {
+                targetTerritory.original = result.image
                 targetTerritory.image = result.image
                 targetTerritory.miniature = result.miniature
                 targetTerritory.isDefault = false
@@ -108,17 +115,14 @@ export const useGenerate = () => {
               completedCount++
               setPendingCount(territories.length - completedCount)
 
-              // Callback pour mettre à jour l'UI après chaque image générée
               callback([...initialTerritories])
             } catch (error) {
               console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
-              // En cas d'erreur, on garde l'image par défaut
               completedCount++
-              setPendingCount(territories.length - completedCount)
-            } finally {
+              setPendingCount(territories.length - completedCount)            } finally {
               resolve()
             }
-          }, index * 25) // 25ms d'écart entre chaque démarrage (respecte la limite IGN de 40 req/sec)
+          }, index * config.ignApiRateLimit)
 
           // Enregistrer le timeout pour pouvoir l'annuler si nécessaire
           abortControllerRef.current?.signal.addEventListener('abort', () => {
@@ -135,8 +139,29 @@ export const useGenerate = () => {
     } finally {
       setLoading(false)
     }
+  }, [imageService])  // Fonction pour générer une image large et la sauvegarder
+
+  const generateAndSaveLargeImage = useCallback(async (
+    territory: Territory,
+    callback: (updatedTerritory: Territory) => void
+  ): Promise<void> => {
+    try {
+      const largeImage = await imageService.generateLargeImage(territory)
+
+      // Mettre à jour le territoire avec l'image large
+      const updatedTerritory = {
+        ...territory,
+        originalLarge: largeImage,
+        large: largeImage // Copier aussi dans large pour l'affichage
+      }
+
+      callback(updatedTerritory)
+    } catch (error) {
+      throw new Error(`Erreur lors de la génération de l'image large: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    }
   }, [imageService])
-  // Fonction pour générer une image large
+
+  // Fonction pour générer une image large (sans sauvegarde)
   const generateLargeImage = useCallback(async (territory: Territory): Promise<string> => {
     try {
       return await imageService.generateLargeImage(territory)
@@ -152,7 +177,9 @@ export const useGenerate = () => {
     } catch (error) {
       throw new Error(`Erreur lors de la génération de la miniature: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
-  }, [imageService])// Fonction pour annuler la génération en cours
+  }, [imageService])
+
+// Fonction pour annuler la génération en cours
   const cancelGeneration = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -166,10 +193,12 @@ export const useGenerate = () => {
   const getPendingCount = useCallback(() => {
     return pendingCount
   }, [pendingCount])
+
   return {
     loading,
     error,
     generateImages,
+    generateAndSaveLargeImage,
     generateLargeImage,
     generateThumbnailFromImage,
     cancelGeneration,

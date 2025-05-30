@@ -1,13 +1,15 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { TOOLS } from './utils/constants';
 import { Point, DrawObject, DrawBrush } from './utils/types';
+import type { PaintLayer } from '../../../utils/types';
+import { LayerService } from '../../../services/layerService';
 import { useHistory, useCanvasState, useDrawingState } from './hooks';
 import { ToolBar, ColorPickers, ActionButtons, NumericInput } from './components';
 import { drawPreviewShape, drawCursorPreview, renderCanvas } from './utils/previewUtils';
 import { moveObjects } from './utils/dragUtils';
 import { isPointInSelectionBounds } from './utils/selectionUtils';
 import { calculateMinZoom, mouseToWorld, worldToScreen as canvasWorldToScreen, CanvasTransformParams } from './utils/canvasUtils';
-import { createToolShape, updateToolShape } from './utils/toolFactory';
+import { createToolShape, updateToolShape, drawToolShape } from './utils/toolFactory';
 import {
   SelectionTool,
   TextTool,
@@ -17,10 +19,11 @@ import SeparatorX from '../../ui/SeparatorX';
 
 interface PaintProps {
   src?: string;
-  onSave?: (imageData: string) => void;
+  layers?: PaintLayer[];
+  onSave?: (layers: PaintLayer[], compositeImage?: string) => void;
 }
 
-const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
+const Paint: React.FC<PaintProps> = ({ src, layers, onSave }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
@@ -83,9 +86,23 @@ const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
     setDraggedObjects,
     dragOffset,
     setDragOffset
-  } = useDrawingState();
+  } = useDrawingState();  const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
+  const [layersLoaded, setLayersLoaded] = useState<boolean>(false);
+  // Effet pour charger les layers existants
+  useEffect(() => {
+    if (layers && layers.length > 0 && !layersLoaded) {
+      const drawObjects = layers
+        .map(LayerService.convertLayerToDrawObject)
+        .filter((obj): obj is DrawObject => obj !== null);
 
-  const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
+      setObjects(drawObjects);
+      addToHistory(drawObjects);
+      setLayersLoaded(true);
+    } else if (!layers || layers.length === 0) {
+      setLayersLoaded(false);
+    }
+  }, [layers, setObjects, addToHistory, layersLoaded]);
+
   // Image loading effect
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -259,6 +276,7 @@ const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
 
     ctx.restore();
   }, [objects, selectedObjects, zoom, offset, isDrawing, startPoint, cursorPosition, currentShape, selectedTool, selectedColor, strokeWidth, img, isDragging, draggedObjects, dragOffset]);
+
   const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -283,7 +301,9 @@ const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
     };
 
     return canvasWorldToScreen({ x: worldX, y: worldY }, canvas, transformParams);
-  }, [canvasDims, offset, zoom]);const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  }, [canvasDims, offset, zoom]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -479,38 +499,56 @@ const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
     setObjects(filteredObjects);
     setSelectedObjects([]);
     addToHistory(filteredObjects);
-  }, [objects, selectedObjects, setObjects, setSelectedObjects, addToHistory]);
-
-  const handleExport = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !onSave) return;
+  }, [objects, selectedObjects, setObjects, setSelectedObjects, addToHistory]);  const handleExport = useCallback(async () => {
+    if (!onSave) return;
 
     try {
-      const exportCanvas = document.createElement('canvas');
-      const exportCtx = exportCanvas.getContext('2d');
-      if (!exportCtx) return;
+      // Convertir les DrawObjects en PaintLayers
+      const paintLayers = objects
+        .map(LayerService.convertDrawObjectToLayer)
+        .filter((layer): layer is PaintLayer => layer !== null);
 
-      if (backgroundImageRef.current) {
-        exportCanvas.width = backgroundImageRef.current.width;
-        exportCanvas.height = backgroundImageRef.current.height;
-
-        exportCtx.drawImage(backgroundImageRef.current, 0, 0);
-      } else {
-        exportCanvas.width = canvasDims.w;
-        exportCanvas.height = canvasDims.h;
-
-        exportCtx.fillStyle = 'white';
-        exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      // Créer l'image composite directement ici
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        onSave(paintLayers);
+        return;
       }
 
-      renderCanvas(exportCtx, objects, []);
+      // Créer un canvas temporaire pour l'image composite
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d')!;
 
-      const dataURL = exportCanvas.toDataURL('image/png');
-      onSave(dataURL);
+      // Utiliser les dimensions de l'image originale si disponible
+      if (img) {
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        // Dessiner l'image de base
+        tempCtx.drawImage(img, 0, 0);
+      } else {
+        // Pas d'image de base, utiliser les dimensions du canvas
+        tempCanvas.width = canvasDims.w;
+        tempCanvas.height = canvasDims.h;
+      }      // Dessiner tous les objets sur le canvas temporaire en utilisant les outils existants
+      objects.forEach(obj => {
+        if (obj.type === 'selection') return; // Ignorer les sélections
+        drawToolShape(tempCtx, obj);
+      });
+
+      // Convertir en base64
+      const compositeImage = tempCanvas.toDataURL('image/png');
+
+      // Passer les layers ET l'image composite
+      onSave(paintLayers, compositeImage);
     } catch (error) {
       console.error('Error exporting canvas:', error);
+      // En cas d'erreur, sauvegarder au moins les layers
+      const paintLayers = objects
+        .map(LayerService.convertDrawObjectToLayer)
+        .filter((layer): layer is PaintLayer => layer !== null);
+      onSave(paintLayers);
     }
-  }, [onSave, objects, canvasDims, renderCanvas]);
+  }, [onSave, objects, img, canvasDims]);
 
   const handleHistoryChange = useCallback((newObjects: DrawObject[] | null) => {
     if (newObjects !== null) {
