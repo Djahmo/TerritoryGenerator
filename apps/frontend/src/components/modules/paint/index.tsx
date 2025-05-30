@@ -20,7 +20,7 @@ interface PaintProps {
   onSave?: (imageData: string) => void;
 }
 
-const Paint: React.FC<PaintProps> = ({ src }) => {
+const Paint: React.FC<PaintProps> = ({ src, onSave }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
@@ -483,18 +483,34 @@ const Paint: React.FC<PaintProps> = ({ src }) => {
 
   const handleExport = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !onSave) return;
 
     try {
-      const dataURL = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = 'canvas-export.png';
-      link.href = dataURL;
-      link.click();
+      const exportCanvas = document.createElement('canvas');
+      const exportCtx = exportCanvas.getContext('2d');
+      if (!exportCtx) return;
+
+      if (backgroundImageRef.current) {
+        exportCanvas.width = backgroundImageRef.current.width;
+        exportCanvas.height = backgroundImageRef.current.height;
+
+        exportCtx.drawImage(backgroundImageRef.current, 0, 0);
+      } else {
+        exportCanvas.width = canvasDims.w;
+        exportCanvas.height = canvasDims.h;
+
+        exportCtx.fillStyle = 'white';
+        exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      }
+
+      renderCanvas(exportCtx, objects, []);
+
+      const dataURL = exportCanvas.toDataURL('image/png');
+      onSave(dataURL);
     } catch (error) {
       console.error('Error exporting canvas:', error);
     }
-  }, []);
+  }, [onSave, objects, canvasDims, renderCanvas]);
 
   const handleHistoryChange = useCallback((newObjects: DrawObject[] | null) => {
     if (newObjects !== null) {

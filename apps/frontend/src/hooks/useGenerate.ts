@@ -136,7 +136,6 @@ export const useGenerate = () => {
       setLoading(false)
     }
   }, [imageService])
-
   // Fonction pour générer une image large
   const generateLargeImage = useCallback(async (territory: Territory): Promise<string> => {
     try {
@@ -144,7 +143,16 @@ export const useGenerate = () => {
     } catch (error) {
       throw new Error(`Erreur lors de la génération de l'image large: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
-  }, [imageService])  // Fonction pour annuler la génération en cours
+  }, [imageService])
+
+  // Fonction pour générer une miniature à partir d'une image existante
+  const generateThumbnailFromImage = useCallback(async (imageDataUrl: string): Promise<string> => {
+    try {
+      return await imageService.generateThumbnailFromImage(imageDataUrl)
+    } catch (error) {
+      throw new Error(`Erreur lors de la génération de la miniature: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    }
+  }, [imageService])// Fonction pour annuler la génération en cours
   const cancelGeneration = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -158,12 +166,12 @@ export const useGenerate = () => {
   const getPendingCount = useCallback(() => {
     return pendingCount
   }, [pendingCount])
-
   return {
     loading,
     error,
     generateImages,
     generateLargeImage,
+    generateThumbnailFromImage,
     cancelGeneration,
     getPendingCount
   }

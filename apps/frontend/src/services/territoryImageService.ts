@@ -158,6 +158,14 @@ export class TerritoryImageService {
   }
 
   /**
+   * Génère une miniature à partir d'une image existante
+   */
+  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
+    const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * THUMBNAIL_CONFIG.CROP_WIDTH)
+    return await createThumbnail(imageDataUrl, THUMBNAIL_CONFIG.CROP_WIDTH, minHeight)
+  }
+
+  /**
    * Crée un canvas avec l'image rotée
    */
   private createRotatedCanvas(image: ImageBitmap, angle: number): HTMLCanvasElement {

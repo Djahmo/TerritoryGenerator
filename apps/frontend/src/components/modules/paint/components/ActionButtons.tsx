@@ -47,7 +47,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ canUndo, canRedo, 
         title="Exporter"
       >
         <Download size={16} />
-        <span className="text-sm">Exporter</span>
+        <span className="text-sm">Sauvegarder</span>
       </button>
     </div>
   );
