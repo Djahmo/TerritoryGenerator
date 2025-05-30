@@ -2,11 +2,47 @@ import { useState, useEffect, useCallback } from "react"
 
 const PHI = (1 + Math.sqrt(5)) / 2
 const CONFIG_KEY = "paint-config-v1"
+const PAPER_WIDTH_CM = 29.7 // A4 width in cm (constant)
+
+// Store global pour partager l'état entre tous les composants
+class ConfigStore {
+  private config: Config
+  private listeners: Set<(config: Config) => void> = new Set()
+
+  constructor(initialConfig: Config) {
+    this.config = initialConfig
+  }
+
+  getConfig(): Config {
+    return this.config
+  }
+
+  setConfig(newConfig: Config | ((prev: Config) => Config)) {
+    const nextConfig = typeof newConfig === 'function' ? newConfig(this.config) : newConfig
+    this.config = nextConfig
+
+    // Sauvegarder dans localStorage
+    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(nextConfig))
+
+    // Dispatcher l'événement personnalisé
+    window.dispatchEvent(new CustomEvent('configChanged', { detail: nextConfig }))
+
+    // Notifier tous les listeners
+    this.listeners.forEach(listener => listener(nextConfig))
+  }
+
+  subscribe(listener: (config: Config) => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+}
+
+// Instance globale du store
+let configStore: ConfigStore | null = null
 
 export type Config = {
   // Configuration du canvas/papier
   ppp: number
-  paperWidth: number
   ratioX: number
   ratioY: number
   palette: string[]
@@ -33,12 +69,19 @@ export type Config = {
 const defaultConfig: Config = {
   // Configuration du canvas/papier
   ppp: 250,
-  paperWidth: 29.7,
   ratioX: 1.41,
   ratioY: 1,
   palette: [
-    "rgba(0,0,0,1)", "rgba(50,75,95,1)", "rgba(0,174,239,1)", "rgba(0,128,0,1)",
-    "rgba(255,0,0,1)", "rgba(255,165,0,1)", "rgba(255,255,0,1)",
+    "rgba(0,0,0,1)",       // Noir
+    "rgba(255,0,0,1)",     // Rouge
+    "rgba(0,128,0,1)",     // Vert
+    "rgba(0,0,255,1)",     // Bleu
+    "rgba(255,255,0,1)",   // Jaune
+    "rgba(255,165,0,1)",   // Orange
+    "rgba(128,0,128,1)",   // Violet
+    "rgba(255,192,203,1)", // Rose
+    "rgba(165,42,42,1)",   // Marron
+    "rgba(128,128,128,1)"  // Gris
   ],
 
   // Configuration de génération d'images
@@ -63,10 +106,25 @@ const defaultConfig: Config = {
 const getResolution = (
   pW: number, rX: number, rY: number, p: number
 ): { widthPx: number; heightPx: number } => {
-  const heightCm = pW * (rY / rX)
-  const widthPx = Math.round((pW / 2.54) * p)
-  const heightPx = Math.round((heightCm / 2.54) * p)
-  return { widthPx, heightPx }
+  let widthCm: number;
+  let heightCm: number;
+
+  if (rX >= rY) {
+    // Format paysage ou carré (ex: 1.41:1)
+    // pW représente la largeur
+    widthCm = pW;
+    heightCm = pW * (rY / rX);
+  } else {
+    // Format portrait (ex: 1:1.41)
+    // pW représente la hauteur (dimension la plus grande)
+    heightCm = pW;
+    widthCm = pW * (rX / rY);
+  }
+
+  const widthPx = Math.round((widthCm / 2.54) * p);
+  const heightPx = Math.round((heightCm / 2.54) * p);
+
+  return { widthPx, heightPx };
 }
 
 const toBase64 = (obj: unknown): string =>
@@ -76,24 +134,35 @@ const fromBase64 = <T = unknown>(b64: string): T =>
   JSON.parse(decodeURIComponent(atob(b64)))
 
 export const useConfig = () => {
-  const [config, setConfig] = useState<Config>(() => {
+  // Initialiser le store global s'il n'existe pas
+  if (!configStore) {
+    let initialConfig: Config
     try {
       const saved = window.localStorage.getItem(CONFIG_KEY)
-      return saved ? { ...defaultConfig, ...JSON.parse(saved) } : defaultConfig
+      initialConfig = saved ? { ...defaultConfig, ...JSON.parse(saved) } : defaultConfig
     } catch {
-      return defaultConfig
+      initialConfig = defaultConfig
     }
-  })
+    configStore = new ConfigStore(initialConfig)
+  }
+
+  const [config, setLocalConfig] = useState<Config>(() => configStore!.getConfig())
 
   useEffect(() => {
-    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
-  }, [config])
+    // S'abonner aux changements du store global
+    const unsubscribe = configStore!.subscribe((newConfig) => {
+      setLocalConfig(newConfig)
+    })
 
-  const set = useCallback<<K extends keyof Config>(key: K, value: Config[K]) => void>(
-    (key, value) => setConfig(c => ({ ...c, [key]: value })),
-    []
-  )
+    return unsubscribe
+  }, [])
+  const setConfig = useCallback((newConfig: Config | ((prev: Config) => Config)) => {
+    configStore!.setConfig(newConfig)
+  }, [])
 
+  const set = useCallback(<K extends keyof Config>(key: K, value: Config[K]) => {
+    setConfig(c => ({ ...c, [key]: value }))
+  }, [setConfig])
   const addColorToPalette = useCallback((color: string) => {
     setConfig(c => {
       if (c.palette.includes(color)) return c
@@ -102,11 +171,11 @@ export const useConfig = () => {
         : [...c.palette, color]
       return { ...c, palette }
     })
-  }, [])
+  }, [setConfig])
 
   const removeColorFromPalette = useCallback((color: string) => {
     setConfig(c => ({ ...c, palette: c.palette.filter(col => col !== color) }))
-  }, [])
+  }, [setConfig])
 
   const exportConfig = useCallback((): string => toBase64(config), [config])
   const importConfig = useCallback((str: string): boolean => {
@@ -117,13 +186,11 @@ export const useConfig = () => {
     } catch {
       return false
     }
-  }, [])
-
+  }, [setConfig])
   const { widthPx: finalWidth, heightPx: finalHeight } = getResolution(
-    config.paperWidth, config.ratioX, config.ratioY, config.ppp
+    PAPER_WIDTH_CM, config.ratioX, config.ratioY, config.ppp
   )
-  const rawSize = Math.round(finalWidth * PHI)
-
+  const rawSize = Math.round(Math.max(finalWidth, finalHeight) * PHI)
   return {
     config,
     setConfig,

@@ -9,6 +9,7 @@ interface InputProps {
   placeholder: string;
   min?: number;
   max?: number;
+  step?: number;
   type: string;
   value: string;
   className?: string;
@@ -21,7 +22,7 @@ interface InputProps {
   Icon?: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
 }
 
-const Input = ({ label, name, placeholder, className, min, max, type, value, onChange, onBlur, onWheel, disabled, autocomplete, verified, Icon }: InputProps) => {
+const Input = ({ label, name, placeholder, className, min, max, step, type, value, onChange, onBlur, onWheel, disabled, autocomplete, verified, Icon }: InputProps) => {
 
   const { t } = useTranslation();
 
@@ -107,6 +108,7 @@ const Input = ({ label, name, placeholder, className, min, max, type, value, onC
           className={"w-full p-2 pb-1 outline-0" + (Icon ? " pl-10" : "")}
           min={type === "number" ? min : undefined}
           max={type === "number" ? max : undefined}
+          step={type === "number" ? step : undefined}
         />
         {type === "password" && (
           <button

@@ -7,7 +7,6 @@ import { loadDefaultThumbnail } from "../services/thumbnailService"
 export const useGenerate = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pendingCount, setPendingCount] = useState(0)
   const defaultImageRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const { config, finalWidth, finalHeight, rawSize, PHI } = useConfig()  // Mémorisation du service pour éviter les recréations
@@ -68,7 +67,6 @@ export const useGenerate = () => {
 
     setLoading(true)
     setError(null)
-    setPendingCount(territories.length)
 
     // Créer un nouveau AbortController pour cette génération
     abortControllerRef.current = new AbortController()
@@ -113,13 +111,12 @@ export const useGenerate = () => {
               }
 
               completedCount++
-              setPendingCount(territories.length - completedCount)
 
               callback([...initialTerritories])
             } catch (error) {
               console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
               completedCount++
-              setPendingCount(territories.length - completedCount)            } finally {
+            } finally {
               resolve()
             }
           }, index * config.ignApiRateLimit)
@@ -133,33 +130,12 @@ export const useGenerate = () => {
       )
 
       await Promise.all(promises)
-      setPendingCount(0)
     } catch (error) {
       setError(`Erreur lors de la génération: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     } finally {
       setLoading(false)
     }
   }, [imageService])  // Fonction pour générer une image large et la sauvegarder
-
-  const generateAndSaveLargeImage = useCallback(async (
-    territory: Territory,
-    callback: (updatedTerritory: Territory) => void
-  ): Promise<void> => {
-    try {
-      const largeImage = await imageService.generateLargeImage(territory)
-
-      // Mettre à jour le territoire avec l'image large
-      const updatedTerritory = {
-        ...territory,
-        originalLarge: largeImage,
-        large: largeImage // Copier aussi dans large pour l'affichage
-      }
-
-      callback(updatedTerritory)
-    } catch (error) {
-      throw new Error(`Erreur lors de la génération de l'image large: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
-    }
-  }, [imageService])
 
   // Fonction pour générer une image large (sans sauvegarde)
   const generateLargeImage = useCallback(async (territory: Territory): Promise<string> => {
@@ -179,29 +155,12 @@ export const useGenerate = () => {
     }
   }, [imageService])
 
-// Fonction pour annuler la génération en cours
-  const cancelGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    setLoading(false)
-    setError(null)
-    setPendingCount(0)
-  }, [])
-
-  // Fonction pour obtenir le nombre de tâches en attente
-  const getPendingCount = useCallback(() => {
-    return pendingCount
-  }, [pendingCount])
 
   return {
     loading,
     error,
     generateImages,
-    generateAndSaveLargeImage,
     generateLargeImage,
-    generateThumbnailFromImage,
-    cancelGeneration,
-    getPendingCount
+    generateThumbnailFromImage
   }
 }

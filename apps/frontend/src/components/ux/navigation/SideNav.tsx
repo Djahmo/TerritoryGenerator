@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FC } from 'react'
-import { Home, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Home, ArrowLeft, ArrowRight, Settings } from 'lucide-react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { motion } from "framer-motion"
@@ -11,7 +11,8 @@ const SideNav: FC = () => {
   const { t } = useTranslation()
 
   const links = [
-    { label: t('c.ux.nav.home'), icon: Home, href: '/' }
+    { label: t('c.ux.nav.home'), icon: Home, href: '/' },
+    { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' }
   ]
 
   const [open, setOpen] = useState(true)

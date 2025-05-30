@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Home, Menu } from 'lucide-react'
+import { Home, Menu, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router'
 import ThemeSelector from '#/ux/ThemeSelector'
@@ -12,6 +12,7 @@ const BottomNav = () => {
 
   const links = [
     { label: t('c.ux.nav.home'), icon: Home, href: '/' },
+    { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' },
   ]
 
   useEffect(() => {

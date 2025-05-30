@@ -68,7 +68,6 @@ const Picker: React.FC<PickerProps> = ({ value, onChange, label, className }) =>
     setDraft(fromColorString(rgba))
     onChange(rgba)
   }
-
   const handleCaseContextMenu = (idx: number, e: React.MouseEvent) => {
     e.preventDefault()
     const rgba = toRgbaString(draft)
