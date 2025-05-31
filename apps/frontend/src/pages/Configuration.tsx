@@ -9,15 +9,17 @@ import { useConfig } from '@/hooks/useConfig'
 import { Download, Upload, RotateCcw } from 'lucide-react'
 import Picker from '#/modules/paint/components/Picker'
 
-const Configuration = () => {  const { t } = useTranslation()
-const {
+const Configuration = () => {
+  const { t } = useTranslation()
+  const {
     config,
     setConfig,
     exportConfig,
     importConfig,
     finalWidth,
     finalHeight,
-    rawSize
+    largeFinalWidth,
+    largeFinalHeight
   } = useConfig()
   const [importText, setImportText] = useState('')
   const [selectedPaletteColor, setSelectedPaletteColor] = useState('rgba(255,255,255,1)')
@@ -32,12 +34,18 @@ const {
     { name: 'Carré', value: '1:1', ratioX: 1, ratioY: 1 },
     { name: 'Ratio d\'or', value: 'φ:1', ratioX: 1.618, ratioY: 1 },
     { name: 'Photo 3:2', value: '3:2', ratioX: 1.5, ratioY: 1 },
-    { name: 'Instagram story', value: '9:16', ratioX: 9/16, ratioY: 1 }
+    { name: 'Instagram story', value: '9:16', ratioX: 9 / 16, ratioY: 1 }
   ]
-
   const getCurrentRatioValue = () => {
     const current = predefinedRatios.find(r =>
       Math.abs(r.ratioX - config.ratioX) < 0.01 && Math.abs(r.ratioY - config.ratioY) < 0.01
+    )
+    return current?.value || 'custom'
+  }
+
+  const getCurrentLargeRatioValue = () => {
+    const current = predefinedRatios.find(r =>
+      Math.abs(r.ratioX - config.largeRatioX) < 0.01 && Math.abs(r.ratioY - config.largeRatioY) < 0.01
     )
     return current?.value || 'custom'
   }
@@ -53,6 +61,21 @@ const {
 
       // Afficher une notification pour confirmer le changement
       toast.success(`Ratio modifié : ${selectedRatio.name}`)
+    }
+  }
+
+  const handleLargeRatioChange = (value: string) => {
+    const selectedRatio = predefinedRatios.find(r => r.value === value)
+    if (selectedRatio) {
+      // Mise à jour atomique des deux valeurs de ratio en une seule opération
+      setConfig(c => ({
+        ...c,
+        largeRatioX: selectedRatio.ratioX,
+        largeRatioY: selectedRatio.ratioY
+      }))
+
+      // Afficher une notification pour confirmer le changement
+      toast.success(`Ratio des plans larges modifié : ${selectedRatio.name}`)
     }
   }
 
@@ -134,59 +157,112 @@ const {
               Importer
             </button>
           </div>
-        </div>        {/* Configuration du canvas/papier */}
+        </div>
+        {/* Configuration du canvas/papier */}
         <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Canvas & Papier</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Points par pouce (PPP)
-                </label>                <Slider
-                  value={[config.ppp]}
-                  onValueChange={([value]) => {
-                    setConfig(c => ({ ...c, ppp: value }))
-                  }}
-                  min={100}
-                  max={250}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="text-sm text-muted mt-1">{config.ppp} PPP</div>
-              </div>
-            </div>
 
-            <div className="space-y-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Ratio d'aspect
-                </label>
-                <Select value={getCurrentRatioValue()} onValueChange={handleRatioChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un ratio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {predefinedRatios.map((ratio) => (
-                      <SelectItem key={ratio.value} value={ratio.value}>
-                        {ratio.name} ({ratio.value})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* PPP - Pleine largeur */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">
+              Points par pouce (PPP)
+            </label>
+            <div className="max-w-md">
+              <Slider
+                value={[config.ppp]}
+                onValueChange={([value]) => {
+                  setConfig(c => ({ ...c, ppp: value }))
+                }}
+                min={100}
+                max={250}
+                step={1}
+                className="w-full"
+              />
+              <div className="text-sm text-muted mt-1">{config.ppp} PPP</div>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 text-sm text-muted">
+          <SeparatorX className="my-4" />
+
+          {/* Deux colonnes : Plans serrés | Plans larges */}
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Colonne Plans serrés */}
             <div>
-              <span className="font-medium">Résolution finale:</span>
-              <br />
-              {finalWidth} × {finalHeight} px
+              <h3 className="text-lg font-semibold mb-4">Plans serrés</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Ratio d'aspect
+                  </label>
+                  <Select value={getCurrentRatioValue()} onValueChange={handleRatioChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un ratio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {predefinedRatios.map((ratio) => (
+                        <SelectItem key={ratio.value} value={ratio.value}>
+                          {ratio.name} ({ratio.value})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="text-sm text-muted">
+                  <span className="font-medium">Configuration:</span>
+                  <br />
+                  {finalWidth} × {finalHeight} px
+                </div>
+              </div>
             </div>
+
+            {/* Colonne Plans larges */}
             <div>
-              <span className="font-medium">Taille brute:</span>
-              <br />
-              {rawSize} px
+              <h3 className="text-lg font-semibold mb-4">Plans larges</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Ratio d'aspect
+                  </label>
+                  <Select value={getCurrentLargeRatioValue()} onValueChange={handleLargeRatioChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un ratio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {predefinedRatios.map((ratio) => (
+                        <SelectItem key={ratio.value} value={ratio.value}>
+                          {ratio.name} ({ratio.value})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Facteur de zoom
+                  </label>
+                  <Slider
+                    value={[config.largeFactor]}
+                    onValueChange={([value]) => {
+                      setConfig(c => ({ ...c, largeFactor: value }))
+                    }}
+                    min={0.05}
+                    max={0.8}
+                    step={0.01}
+                    className="w-full"
+                  />
+                  <div className="text-sm text-muted mt-1">
+                    {config.largeFactor.toFixed(2)} (petit = plus large, grand = plus serré)
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted">
+                  <span className="font-medium">Configuration:</span>
+                  <br />
+                  {largeFinalWidth} × {largeFinalHeight} px
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -199,10 +275,10 @@ const {
               <label className="block text-sm font-medium mb-2">
                 Couleur du contour
               </label>              <div className="flex gap-2">                <Picker
-                  value={config.contourColor}
-                  onChange={(color) => setConfig(c => ({ ...c, contourColor: color }))}
-                  label="Couleur du contour"
-                />
+                value={config.contourColor}
+                onChange={(color) => setConfig(c => ({ ...c, contourColor: color }))}
+                label="Couleur du contour"
+              />
                 <Input
                   type="text"
                   value={config.contourColor}
@@ -229,7 +305,7 @@ const {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Largeur des miniatures
-              </label>              <Input                type="number"
+              </label>              <Input type="number"
                 value={config.thumbnailWidth.toString()}
                 onChange={(e) => setConfig(c => ({ ...c, thumbnailWidth: parseInt(e.target.value) || 500 }))}
                 placeholder="Largeur des miniatures"
@@ -277,7 +353,7 @@ const {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Nombre de tentatives
-              </label>              <Input                type="number"
+              </label>              <Input type="number"
                 value={config.networkRetries.toString()}
                 onChange={(e) => setConfig(c => ({ ...c, networkRetries: parseInt(e.target.value) || 3 }))}
                 placeholder="Nombre de tentatives"
@@ -289,7 +365,7 @@ const {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Délai entre tentatives (ms)
-              </label>              <Input                type="number"
+              </label>              <Input type="number"
                 value={config.networkDelay.toString()}
                 onChange={(e) => setConfig(c => ({ ...c, networkDelay: parseInt(e.target.value) || 1000 }))}
                 placeholder="Délai entre tentatives"
@@ -302,7 +378,7 @@ const {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Limite API IGN (ms)
-              </label>              <Input                type="number"
+              </label>              <Input type="number"
                 value={config.ignApiRateLimit.toString()}
                 onChange={(e) => setConfig(c => ({ ...c, ignApiRateLimit: parseInt(e.target.value) || 40 }))}
                 placeholder="Limite API IGN"
@@ -321,7 +397,7 @@ const {
             <div>
               <label className="block text-sm font-medium mb-2">
                 URL de base
-              </label>              <Input                type="text"
+              </label>              <Input type="text"
                 value={config.ignApiBaseUrl}
                 onChange={(e) => setConfig(c => ({ ...c, ignApiBaseUrl: e.target.value }))}
                 placeholder="https://data.geopf.fr/wms-r"
@@ -332,7 +408,7 @@ const {
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Couche
-                </label>                <Input                  type="text"
+                </label>                <Input type="text"
                   value={config.ignApiLayer}
                   onChange={(e) => setConfig(c => ({ ...c, ignApiLayer: e.target.value }))}
                   placeholder="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"

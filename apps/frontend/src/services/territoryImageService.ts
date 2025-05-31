@@ -20,13 +20,16 @@ import { type GeneratedImage, type ImageGenerationConfig } from '../utils/types'
 /**
  * Service principal pour la génération d'images de territoires
  */
-export class TerritoryImageService {
-  constructor(
-    private config: { ppp: number },
+export class TerritoryImageService {  constructor(
+    private config: { ppp: number, largeFactor: number },
     private dimensions: {
       finalWidth: number
       finalHeight: number
       rawSize: number
+      // Ajouter les dimensions pour les plans larges
+      largeFinalWidth?: number
+      largeFinalHeight?: number
+      largeRawSize?: number
     },
     private PHI: number,
     private userConfig: {
@@ -128,11 +131,9 @@ export class TerritoryImageService {
       contourColor: this.userConfig.contourColor,
       contourWidth: this.userConfig.contourWidth,
       ...options
-    }
-
-    // 1. Calcul de la bounding box pour plan large
+    }    // 1. Calcul de la bounding box pour plan large
     const bbox = calculateBoundingBox(territory.polygon, true, this.config, this.PHI)    // 2. Chargement de l'image
-    const url = buildIgnUrl(bbox, this.dimensions.rawSize, {
+    const url = buildIgnUrl(bbox, this.dimensions.largeRawSize || this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
       layer: this.userConfig.ignApiLayer,
       format: this.userConfig.ignApiFormat,
@@ -146,33 +147,34 @@ export class TerritoryImageService {
 
     // 3. Création du canvas de base
     const canvas = document.createElement('canvas')
-    canvas.width = this.dimensions.rawSize
-    canvas.height = this.dimensions.rawSize
+    const canvasSize = this.dimensions.largeRawSize || this.dimensions.rawSize
+    canvas.width = canvasSize
+    canvas.height = canvasSize
     const ctx = canvas.getContext('2d')!
     ctx.drawImage(mapImage, 0, 0)
 
     // 4. Redimensionnement direct
+    const finalWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
+    const finalHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight
     const finalCanvas = cropAndResize(
       canvas,
-      { x: 0, y: 0, width: this.dimensions.rawSize, height: this.dimensions.rawSize },
-      this.dimensions.finalWidth,
-      this.dimensions.finalHeight
-    )
-
-    // 5. Transformation du polygone
+      { x: 0, y: 0, width: canvasSize, height: canvasSize },
+      finalWidth,
+      finalHeight
+    )    // 5. Transformation du polygone
     const polygonPixels = territory.polygon.map(coord =>
-      gpsToPixel(coord.lat, coord.lon, bbox, this.dimensions.rawSize)
+      gpsToPixel(coord.lat, coord.lon, bbox, canvasSize)
     )
 
     const finalPolygon = polygonPixels.map(([x, y]) => {
-      const xf = (x * this.dimensions.finalWidth) / this.dimensions.rawSize
-      const yf = (y * this.dimensions.finalHeight) / this.dimensions.rawSize
+      const xf = (x * finalWidth) / canvasSize
+      const yf = (y * finalHeight) / canvasSize
       return [xf, yf] as [number, number]
     })
 
     // 6. Ajout du masque et du contour
     const finalCtx = finalCanvas.getContext('2d')!
-    drawMask(finalCtx, finalPolygon, this.dimensions.finalWidth, this.dimensions.finalHeight, {
+    drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
       planLarge: true
     })
     drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })

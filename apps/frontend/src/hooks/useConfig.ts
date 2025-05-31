@@ -45,6 +45,11 @@ export type Config = {
   ppp: number
   ratioX: number
   ratioY: number
+  // Nouveau: ratio pour les plans larges
+  largeRatioX: number
+  largeRatioY: number
+  // Nouveau: facteur pour les plans larges
+  largeFactor: number
   palette: string[]
 
   // Configuration de génération d'images
@@ -71,6 +76,10 @@ const defaultConfig: Config = {
   ppp: 250,
   ratioX: 1.41,
   ratioY: 1,
+  // Configuration pour les plans larges
+  largeRatioX: 1.78, // Défaut à 16:9
+  largeRatioY: 1,
+  largeFactor: 0.2, // Valeur par défaut utilisée précédemment
   palette: [
     "rgba(0,0,0,1)",       // Noir
     "rgba(255,0,0,1)",     // Rouge
@@ -190,7 +199,15 @@ export const useConfig = () => {
   const { widthPx: finalWidth, heightPx: finalHeight } = getResolution(
     PAPER_WIDTH_CM, config.ratioX, config.ratioY, config.ppp
   )
+
+  // Dimensions pour les plans larges
+  const { widthPx: largeFinalWidth, heightPx: largeFinalHeight } = getResolution(
+    PAPER_WIDTH_CM, config.largeRatioX, config.largeRatioY, config.ppp
+  )
+
   const rawSize = Math.round(Math.max(finalWidth, finalHeight) * PHI)
+  const largeRawSize = Math.round(Math.max(largeFinalWidth, largeFinalHeight) * PHI)
+
   return {
     config,
     setConfig,
@@ -202,6 +219,10 @@ export const useConfig = () => {
     finalWidth,
     finalHeight,
     rawSize,
+    // Ajouter les dimensions pour les plans larges
+    largeFinalWidth,
+    largeFinalHeight,
+    largeRawSize,
     PHI
   }
 }

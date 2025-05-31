@@ -26,7 +26,7 @@ const Territory = () => {
 
   const handleRename = () => {
     const updatedTerritorys = cache?.territories.map(t => t.num === num ? { ...t, name: inputName } : t)
-    if(updatedTerritorys) updateTerritories(updatedTerritorys)
+    if (updatedTerritorys) updateTerritories(updatedTerritorys)
   }
   const handleToggleLarge = async () => {
     if (!territory) return
@@ -60,20 +60,22 @@ const Territory = () => {
         return;
       }
 
-      const miniature = await generateThumbnailFromImage(compositeImage)
+      let updates: any = {};
 
-      const updates = {
-        ...(isLarge
-          ? {
-              paintLayersLarge: layers,
-              large: compositeImage
-            }
-          : {
-              paintLayersImage: layers,
-              image: compositeImage
-            }
-        ),
-        miniature: miniature
+      if (isLarge) {
+        // Pour les plans larges, on ne touche pas à la miniature
+        updates = {
+          paintLayersLarge: layers,
+          large: compositeImage
+        };
+      } else {
+        // Pour les plans serrés, on génère et met à jour la miniature
+        const miniature = await generateThumbnailFromImage(compositeImage);
+        updates = {
+          paintLayersImage: layers,
+          image: compositeImage,
+          miniature: miniature
+        };
       }
 
       updateTerritory(num!, updates)
@@ -101,37 +103,33 @@ const Territory = () => {
 
   return (
     <Wrapper className="mt-4 px-4 pb-8 flex flex-col items-center gap-6 overflow-y-auto h-full">      <h1 className="text-3xl font-bold flex">
-        <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
-        <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du térritoire" className="mb-0" />
-      </h1>
-
-      {/* Bouton pour basculer entre vue normale et plan large */}
-      <div className="flex gap-2 items-center">
-        <button
+      <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
+      <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du térritoire" className="mb-0" />
+    </h1>      {/* Bouton pour basculer entre vue normale et plan large */}
+      <div className="flex gap-2 items-center">        <button
           onClick={handleToggleLarge}
           disabled={isGeneratingLarge}
-          className={`px-4 py-2 rounded-lg transition-colors ${
-            isLarge
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-          } ${isGeneratingLarge ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {isGeneratingLarge ? (
+          className={`px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-2 font-medium ${isLarge
+              ? 'bg-blue-500 text-white hover:bg-blue-600 ring-blue-200 hover:ring-2'
+              : 'bg-gray-100 text-gray-800 hover:bg-gray-200 ring-gray-200 hover:ring-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
+            } ${isGeneratingLarge ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >{isGeneratingLarge ? (
             <>
-              <Loader enabled />
-              {t("territory.generating_large", "Génération...")}
+              <div className="animate-spin mr-2">⟳</div>
+              <span>Génération...</span>
             </>
           ) : (
-            isLarge
-              ? t("territory.view_normal", "Vue normale")
-              : t("territory.view_large", "Plan large")
+            <div className="flex items-center gap-2 cursor-pointer">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isLarge
+                  ? <path d="M9 9h6v6H9z"/> /* Icône carré (vue standard) */
+                  : <path d="M21 21H3V3h18v18z"/> /* Icône cadre (vue élargie) */
+                }
+              </svg>
+              <span>{isLarge ? "Vue standard" : "Vue plan large"}</span>
+            </div>
           )}
         </button>
-        {isLarge && (
-          <span className="text-sm text-gray-500">
-            {t("territory.large_mode", "Mode plan large")}
-          </span>
-        )}
       </div>
 
       <div className="w-full flex justify-center">

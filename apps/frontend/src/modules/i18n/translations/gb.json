@@ -12,7 +12,7 @@
     "md": {},
     "ux": {
       "nav": {
-        "home": "Home"
+        "home": "My Territories"
       },
       "errorBoundary": {
         "title": "💥 An error occurred",

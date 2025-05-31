@@ -4,16 +4,23 @@ import { useConfig } from "&/useConfig"
 import { TerritoryImageService } from "../services/territoryImageService"
 import { loadDefaultThumbnail } from "../services/thumbnailService"
 
-export const useGenerate = () => {
-  const [loading, setLoading] = useState(false)
+export const useGenerate = () => {  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const defaultImageRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { config, finalWidth, finalHeight, rawSize, PHI } = useConfig()  // Mémorisation du service pour éviter les recréations
+  const { config, finalWidth, finalHeight, rawSize, largeFinalWidth, largeFinalHeight, largeRawSize, PHI } = useConfig()  // Mémorisation du service pour éviter les recréations
   const imageService = useMemo(() =>
     new TerritoryImageService(
       config,
-      { finalWidth, finalHeight, rawSize },
+      {
+        finalWidth,
+        finalHeight,
+        rawSize,
+        // Ajouter les dimensions pour les plans larges
+        largeFinalWidth,
+        largeFinalHeight,
+        largeRawSize
+      },
       PHI,
       {
         contourColor: config.contourColor,
@@ -24,11 +31,10 @@ export const useGenerate = () => {
         ignApiFormat: config.ignApiFormat,
         ignApiCRS: config.ignApiCRS,
         networkRetries: config.networkRetries,
-        networkDelay: config.networkDelay,
-        ignApiRateLimit: config.ignApiRateLimit
+        networkDelay: config.networkDelay,        ignApiRateLimit: config.ignApiRateLimit
       }
     ),
-    [config, finalWidth, finalHeight, rawSize, PHI]
+    [config, finalWidth, finalHeight, rawSize, largeFinalWidth, largeFinalHeight, largeRawSize, PHI]
   )
 
   // Chargement de l'image par défaut

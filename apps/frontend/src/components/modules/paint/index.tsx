@@ -478,7 +478,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
     // Coordonnées dans l'espace du canvas (avant transformation zoom/offset)
     const canvasX = (e.clientX - rect.left) * scaleX;
-    const canvasY = (e.clientY - rect.top) * scaleY;    handleWheel(e.nativeEvent, canvasX, canvasY);
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    handleWheel(e.nativeEvent, canvasX, canvasY);
   }, [handleWheel, canvasDims]);
 
   const handleTextSubmit = useCallback(() => {

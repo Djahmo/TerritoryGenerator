@@ -76,7 +76,7 @@ export const gpsToPixel = (
 export const calculateBoundingBox = (
   polygon: Coord[],
   planLarge: boolean,
-  config: { ppp: number },
+  config: { ppp: number, largeFactor: number },
   PHI: number
 ): [number, number, number, number] => {
   const lats = polygon.map(p => p.lat)
@@ -90,11 +90,10 @@ export const calculateBoundingBox = (
   const diag = Math.hypot(maxLat - minLat, maxLon - minLon)
   const centerLat = (minLat + maxLat) / 2
   const centerLon = (minLon + maxLon) / 2
-
   let size: number
 
   if (planLarge) {
-    size = diag / 0.2
+    size = diag / config.largeFactor
   } else {
     const factor = (200 / config.ppp) * 1.2
     const minSize = 0.01618 / factor // Nombre d'or pour taille minimale
