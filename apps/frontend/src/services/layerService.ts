@@ -15,6 +15,7 @@ export class LayerService {
 
   static convertDrawObjectToLayer(drawObject: DrawObject): PaintLayer | null {
     if (!drawObject) return null
+    console.log('[LayerService] Converting DrawObject to Layer:', drawObject);
     const baseLayer = {
       id: LayerService.generateLayerId(drawObject.type),
       type: drawObject.type as PaintLayer['type'],
@@ -112,6 +113,7 @@ export class LayerService {
    */
   static convertLayerToDrawObject(layer: PaintLayer): DrawObject | null {
     if (!layer) return null
+    console.log('[LayerService] Converting Layer to DrawObject:', layer);
 
     const baseObject = {
       type: layer.type,

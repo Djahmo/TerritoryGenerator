@@ -6,6 +6,16 @@
       "title": "Oops... this page doesn't exist 🕵️‍♂️",
       "description": "The page you're looking for doesn't exist or has been deleted.",
       "back": "Return to homepage"
+    },
+    "territory": {
+      "save_success": "Territory saved successfully!",
+      "generate_large_error": "Error generating large plan",
+      "regenerate_success": "Image regenerated successfully",
+      "regenerate_large_success": "Large plan regenerated successfully",
+      "regenerate_error": "Error regenerating image",
+      "confirm_regenerate_title": "Confirm regeneration",
+      "confirm_regenerate_standard": "Are you sure you want to regenerate the standard image? This action will retrieve a new image, and all current modifications will be lost.",
+      "confirm_regenerate_large": "Are you sure you want to regenerate the large plan? This action will retrieve a new image, and all current modifications will be lost."
     }
   },
   "c": {
@@ -26,6 +36,8 @@
     "loading": "Loading...",
     "copied": "{{thing}} copied to clipboard",
     "error": "An error occurred",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
     "status": {
       "online": "You are online",
       "offline": "You are offline"

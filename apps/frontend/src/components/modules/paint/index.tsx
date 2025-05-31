@@ -95,22 +95,37 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     layersLoaded: false
   });
     // Effet pour charger les layers existants
-  useEffect(() => {    // Reset layers when switching between normal/large modes
+  useEffect(() => {
+    console.log('[Paint] useEffect layers', {
+      layers,
+      isLarge,
+      currentMode,
+      objects: objects.length
+    });
+
+    // Reset layers when switching between normal/large modes
     if (currentMode.isLarge !== isLarge) {
       setCurrentMode({ isLarge, layersLoaded: false });
       setObjects([]);
       // Ne pas faire de return ici - continuer pour charger les layers du nouveau mode
-    }// Load layers if they exist and haven't been loaded for current mode OR if mode just changed
+    }
+
+    // Load layers if they exist and haven't been loaded for current mode OR if mode just changed
     const shouldLoadLayers = layers && layers.length > 0 &&
       (!currentMode.layersLoaded || currentMode.isLarge !== isLarge);
-      if (shouldLoadLayers) {
+
+    if (shouldLoadLayers) {
+      console.log('[Paint] Chargement des layers', layers);
       const drawObjects = layers
         .map(LayerService.convertLayerToDrawObject)
         .filter((obj): obj is DrawObject => obj !== null);
 
+      console.log('[Paint] Conversion des layers en drawObjects', drawObjects);
       setObjects(drawObjects);
       addToHistory(drawObjects);
-      setCurrentMode({ isLarge, layersLoaded: true });    } else if (!layers || layers.length === 0) {
+      setCurrentMode({ isLarge, layersLoaded: true });
+    } else if (!layers || layers.length === 0) {
+      console.log('[Paint] Aucun layer à charger');
       setCurrentMode({ isLarge, layersLoaded: false });
       // Ne pas effacer les objets existants si l'utilisateur a déjà dessiné
       // Seulement les effacer si nous n'avons pas d'objets actuels

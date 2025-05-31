@@ -6,6 +6,16 @@
       "title": "Oups... cette page n'existe pas 🕵️‍♂️",
       "description": "La page que vous cherchez n'existe pas ou a été supprimée.",
       "back": "Retour à l'accueil"
+    },
+    "territory": {
+      "save_success": "Territoire sauvegardé avec succès !",
+      "generate_large_error": "Erreur lors de la génération du plan large",
+      "regenerate_success": "Image régénérée avec succès",
+      "regenerate_large_success": "Plan large régénéré avec succès",
+      "regenerate_error": "Erreur lors de la régénération de l'image",
+      "confirm_regenerate_title": "Confirmer la régénération",
+      "confirm_regenerate_standard": "Êtes-vous sûr de vouloir régénérer l'image resserée ? Cette action récupérera une nouvelle image et supprimera les modifications actuelles.",
+      "confirm_regenerate_large": "Êtes-vous sûr de vouloir régénérer le plan large ? Cette action récupérera une nouvelle image et supprimera les modifications actuelles."
     }
   },
   "c": {
@@ -26,6 +36,8 @@
     "loading": "Chargement...",
     "copied": "{{thing}} copié dans le presse-papiers",
     "error": "Une erreur est survenue",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
     "status": {
       "online": "Vous êtes en ligne",
       "offline": "Vous êtes hors ligne"

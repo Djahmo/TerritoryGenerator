@@ -151,7 +151,6 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
       throw new Error(`Erreur lors de la génération de l'image large: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
   }, [imageService])
-
   // Fonction pour générer une miniature à partir d'une image existante
   const generateThumbnailFromImage = useCallback(async (imageDataUrl: string): Promise<string> => {
     try {
@@ -161,12 +160,22 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
     }
   }, [imageService])
 
+  // Fonction pour générer une image standard pour un territoire
+  const generateStandardImage = useCallback(async (territory: Territory): Promise<string> => {
+    try {
+      const result = await imageService.generateStandardImage(territory)
+      return result.image
+    } catch (error) {
+      throw new Error(`Erreur lors de la génération de l'image standard: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    }
+  }, [imageService])
 
   return {
     loading,
     error,
     generateImages,
     generateLargeImage,
-    generateThumbnailFromImage
+    generateThumbnailFromImage,
+    generateStandardImage
   }
 }
