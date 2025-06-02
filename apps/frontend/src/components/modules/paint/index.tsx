@@ -166,12 +166,11 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       setImg(img);
 
       const containerRect = container.getBoundingClientRect();
-      const canvasWidth = containerRect.width;
-
-      // Calculer les dimensions en tenant compte de la limite de hauteur
+      const canvasWidth = containerRect.width;      // Calculer les dimensions en tenant compte de la limite de hauteur
       let canvasHeight, zoomMin;
-        if (img.height > 700) {
-        // Image portrait ou très haute : limiter la hauteur à 700px
+        // IMPORTANT: Limitation de hauteur SEULEMENT pour les images portrait (height > width)
+        if (img.height > 700 && img.height > img.width) {
+        // Image portrait très haute : limiter la hauteur à 700px
         canvasHeight = 700;
         // Pour les images portrait, on veut que l'image rentre dans le canvas, pas qu'elle le couvre
         const heightRatio = img.height / 700;
@@ -240,8 +239,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
 
-        if (img.height > 700) {
-          // Image portrait ou très haute : limiter la hauteur à 700px
+        if (img.height > 700 && img.height > img.width) {
+          // Image portrait très haute : limiter la hauteur à 700px
           canvasHeight = 700;
         } else {
           // Image normale : utiliser le ratio original mais limiter la hauteur
@@ -261,8 +260,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       canvas.style.height = `${canvasHeight}px`;      if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
         let zoomMin;
-          if (img.height > 700) {
-          // Image portrait ou très haute : calculer le zoom basé sur la hauteur limitée
+          if (img.height > 700 && img.height > img.width) {
+          // Image portrait très haute : calculer le zoom basé sur la hauteur limitée
           const heightRatio = img.height / 700;
           const adjustedImgWidth = img.width / heightRatio;
           // Pour les images portrait, on veut que l'image rentre dans le canvas

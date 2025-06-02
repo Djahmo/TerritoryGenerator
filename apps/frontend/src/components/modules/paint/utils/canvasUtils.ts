@@ -42,9 +42,9 @@ export const clampOffset = (
   const imgHeight = img.height * zoom
   let clampedX = offset.x
   let clampedY = offset.y
-
-  // Détecter les images portrait avec hauteur limitée (hauteur originale > 700px)
-  const isPortraitWithHeightLimit = img.height > 700
+  // Détecter les images portrait avec hauteur limitée 
+  // IMPORTANT: Appliquer SEULEMENT aux images en format portrait (height > width)
+  const isPortraitWithHeightLimit = img.height > 700 && img.height > img.width
 
   // Détecter si l'image est plus petite que le canvas sur une dimension
   const imageWidthSmallerThanCanvas = imgWidth < canvasWidth
