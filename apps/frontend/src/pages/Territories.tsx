@@ -1,45 +1,28 @@
 import { type FC, useEffect, useState } from 'react'
 import Wrapper from '#/ui/Wrapper'
 import { useTranslation } from 'react-i18next'
-import { useFileReader, parse, handleGpxDownload, makeGpx } from '&/useFile'
-import { useGenerate } from '&/useGenerate'
-import FileUpload from '#/ui/FileUpload'
+import { handleGpxDownload } from '&/useFile'
 import MapCard from '@/components/modules/MapCard'
 import Input from '@/components/ui/Input'
 import { Search } from 'lucide-react'
-import { useTerritoryCache } from '@/hooks/useTerritoryCache' // ← à adapter selon l'emplacement
+import { useTerritoryCache } from '@/hooks/useTerritoryCache'
+import { useNavigate } from 'react-router'
 
-const Home: FC = () => {
+const Territories: FC = () => {
   const { t } = useTranslation()
-  const { content, type, error: fileError, readFile } = useFileReader()
-  const { loading, error: imgError, generateImages } = useGenerate()
-  const { cache, updateGpx, updateTerritories } = useTerritoryCache()
+  const { cache, updateTerritories } = useTerritoryCache()
+  const navigate = useNavigate()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
-  useEffect(() => {
+    useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
+    } else {
+      // Rediriger vers la page d'accueil si aucun territoire en cache
+      navigate('/')
     }
-  }, [cache])
-
-  useEffect(() => {
-    (async () => {
-      if (content && type) {
-        const parsed = parse(content, type)
-        setTerritorys(parsed.sort((a, b) => a.num.localeCompare(b.num)))
-        if (parsed.length) {
-          await generateImages(parsed, (territorys) => {
-            setTerritorys(territorys)
-            if (territorys.every(t => !t.isDefault && t.image)) {
-              updateGpx(makeGpx(parsed))
-              updateTerritories(territorys)
-            }
-          })
-        }
-      }
-    })()
-  }, [content, type, generateImages])
-
+  }, [cache, navigate])
+  
   const handleRename = (num: string, name: string) => {
     const updatedTerritorys = territorys.map(t => t.num === num ? { ...t, name } : t)
     setTerritorys(updatedTerritorys)
@@ -48,12 +31,7 @@ const Home: FC = () => {
 
   return (
     <Wrapper className="mt-4 px-4 flex flex-col items-center gap-6 overflow-y-auto h-full">
-      <h1 className="text-3xl font-bold">{t("home.upload_title", "Charger un fichier territoire")}</h1>
-
-      {!territorys.length && <FileUpload onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')} loading={loading} />}
-
-      {fileError && <div className="text-red-500">{fileError}</div>}
-      {imgError && <div className="text-red-500">{imgError}</div>}
+      <h1 className="text-3xl font-bold">{t("territories.title", "Mes territoires")}</h1>
 
       {!!territorys.length && (
         <div className='flex items-center gap-2 w-full'>
@@ -83,4 +61,4 @@ const Home: FC = () => {
   )
 }
 
-export default Home
+export default Territories

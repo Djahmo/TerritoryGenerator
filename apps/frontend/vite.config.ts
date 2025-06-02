@@ -27,7 +27,16 @@ export default defineConfig(({ mode }) => ({
     host: true,
     port: 5173,
     https: mode === "web" ? {} : false,
-    proxy: {},
+    proxy: {
+      '/api/tiles': {
+        target: 'https://tile.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/tiles/, ''),
+        headers: {
+          'User-Agent': 'TerritoryGenerator/1.0'
+        }
+      }
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'

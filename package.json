@@ -18,5 +18,8 @@
   "devDependencies": {
     "turbo": "^2.5.3",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.8"
   }
 }

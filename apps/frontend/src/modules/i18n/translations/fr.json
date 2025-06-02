@@ -22,7 +22,9 @@
     "md": {},
     "ux": {
       "nav": {
-        "home": "Mes térritoires"
+        "home": "Mon térritoire",
+        "allTerritories": "Tous les territoires",
+        "configuration": "Configuration"
       },
       "errorBoundary": {
         "title": "💥 Une erreur est survenue",
