@@ -42,7 +42,7 @@ export const clampOffset = (
   const imgHeight = img.height * zoom
   let clampedX = offset.x
   let clampedY = offset.y
-  // Détecter les images portrait avec hauteur limitée 
+  // Détecter les images portrait avec hauteur limitée
   // IMPORTANT: Appliquer SEULEMENT aux images en format portrait (height > width)
   const isPortraitWithHeightLimit = img.height > 700 && img.height > img.width
 
@@ -75,21 +75,13 @@ export const clampOffset = (
     // Le bord gauche de l'image ne doit jamais être plus à l'intérieur que cette limite
     const leftBorderLimit = canvasWidth / 2 - imgWidthAtMinZoom / 2;
 
-    // Convertir en limites d'offset :
-    // - maxOffsetX : quand le bord gauche de l'image est à leftBorderLimit
-    // - minOffsetX : quand le bord droit de l'image est à rightBorderLimit
-    const maxOffsetX = leftBorderLimit; // Bord gauche à la limite gauche
-    const minOffsetX = rightBorderLimit - imgWidth; // Bord droit à la limite droite
+    const maxOffsetX = leftBorderLimit;
+    const minOffsetX = rightBorderLimit - imgWidth;
 
     clampedX = Math.min(maxOffsetX, Math.max(minOffsetX, offset.x));
 
-    // Axe Y : contraintes classiques pour couvrir le canvas
     clampedY = Math.min(0, Math.max(canvasHeight - imgHeight, offset.y));
   } else if (imageWidthSmallerThanCanvas) {
-    // Pour les images plus étroites que le canvas (mais pas portrait) :
-    // - Axe X libre avec limites raisonnables
-    // - Axe Y contraint selon la taille
-
     const maxOffsetX = canvasWidth * 0.5
     const minOffsetX = canvasWidth - imgWidth - canvasWidth * 0.5
     clampedX = Math.min(maxOffsetX, Math.max(minOffsetX, offset.x))
@@ -115,13 +107,6 @@ export const clampOffset = (
   }
 }
 
-/**
- * Transformations de coordonnées optimisées pour le canvas
- */
-
-/**
- * Interface pour les paramètres de transformation du canvas
- */
 export interface CanvasTransformParams {
   canvasDims: { w: number; h: number };
   offset: { x: number; y: number };
