@@ -144,11 +144,10 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     if (!src) {
       // Pas d'image source, initialiser avec dimensions par défaut
       backgroundImageRef.current = null;
-      setImg(null);
-
-      const containerRect = container.getBoundingClientRect();
+      setImg(null);      const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      const canvasHeight = Math.round(canvasWidth * 0.75); // Ratio 4:3 par défaut
+      const calculatedHeight = Math.round(canvasWidth * 0.75); // Ratio 4:3 par défaut
+      const canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -160,9 +159,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       setZoomMin(1);
       setOffset({ x: 0, y: 0 });
       return;
-    }
-
-    const img = new Image();
+    }    const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       backgroundImageRef.current = img;
@@ -170,18 +167,35 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      const canvasHeight = Math.round((canvasWidth * img.height) / img.width);
+
+      // Calculer les dimensions en tenant compte de la limite de hauteur
+      let canvasHeight, zoomMin;
+        if (img.height > 700) {
+        // Image portrait ou très haute : limiter la hauteur à 700px
+        canvasHeight = 700;
+        // Pour les images portrait, on veut que l'image rentre dans le canvas, pas qu'elle le couvre
+        const heightRatio = img.height / 700;
+        const adjustedImgWidth = img.width / heightRatio;
+
+        // Le zoom minimum est basé sur le fait que l'image doit rentrer dans le canvas
+        zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
+      } else {
+        // Image normale : utiliser le ratio original mais limiter la hauteur
+        const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
+        canvasHeight = Math.min(calculatedHeight, 700);
+        // Pour les images normales, on garde le comportement standard
+        zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
+      }
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;      canvas.style.width = `${canvasWidth}px`;
       canvas.style.height = `${canvasHeight}px`;
 
-      const zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
       setZoomMin(zoomMin);
       setZoom(zoomMin);
 
-      // Centre l'image seulement lors du chargement initial
+      // Centre l'image lors du chargement initial
       const scaledImgWidth = img.width * zoomMin;
       const scaledImgHeight = img.height * zoomMin;
 
@@ -193,12 +207,11 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
     img.onerror = () => {
       backgroundImageRef.current = null;
-      setImg(null);
-
-      // En cas d'erreur, utiliser les dimensions par défaut
+      setImg(null);      // En cas d'erreur, utiliser les dimensions par défaut
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      const canvasHeight = Math.round(canvasWidth * 0.75);
+      const calculatedHeight = Math.round(canvasWidth * 0.75);
+      const canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -223,14 +236,21 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      let canvasHeight;
-
-      // Si on a une image, utiliser son ratio
+      let canvasHeight;      // Si on a une image, calculer les dimensions appropriées
       if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
-        canvasHeight = Math.round((canvasWidth * img.height) / img.width);
+
+        if (img.height > 700) {
+          // Image portrait ou très haute : limiter la hauteur à 700px
+          canvasHeight = 700;
+        } else {
+          // Image normale : utiliser le ratio original mais limiter la hauteur
+          const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
+          canvasHeight = Math.min(calculatedHeight, 700);
+        }
       } else {
-        canvasHeight = Math.round(canvasWidth * 0.75);
+        const calculatedHeight = Math.round(canvasWidth * 0.75);
+        canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
       }
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
@@ -240,12 +260,23 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       canvas.style.width = `${canvasWidth}px`;
       canvas.style.height = `${canvasHeight}px`;      if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
-        const zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
+        let zoomMin;
+          if (img.height > 700) {
+          // Image portrait ou très haute : calculer le zoom basé sur la hauteur limitée
+          const heightRatio = img.height / 700;
+          const adjustedImgWidth = img.width / heightRatio;
+          // Pour les images portrait, on veut que l'image rentre dans le canvas
+          zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
+        } else {
+          // Image normale : utiliser le calcul standard (l'image doit couvrir le canvas)
+          zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
+        }
+
         setZoomMin(zoomMin);
 
         if (zoom < zoomMin) {
           setZoom(zoomMin);
-          // Seulement centrer si on doit réajuster le zoom au minimum
+          // Centrer l'image quand on réajuste le zoom
           const scaledImgWidth = img.width * zoomMin;
           const scaledImgHeight = img.height * zoomMin;
 

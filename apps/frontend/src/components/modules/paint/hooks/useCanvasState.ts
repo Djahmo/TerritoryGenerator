@@ -21,23 +21,20 @@ export const useCanvasState = () => {
     const handleWheel = useCallback((e: WheelEvent, mouseX: number, mouseY: number) => {
     e.preventDefault()
 
-    if (!img) return
-
-    // Coordonnées du monde au point de la souris AVANT zoom
+    if (!img) return    // Coordonnées du monde au point de la souris AVANT zoom
     const wx = (mouseX - offset.x) / zoom
     const wy = (mouseY - offset.y) / zoom
 
     const zoomAmount = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR
 
-    // Calculer le zoom minimum dynamique pour s'assurer que l'image couvre le canvas
-    const dynamicZoomMin = calculateMinZoom(img, canvasDims)
-    const nextZoom = Math.max(dynamicZoomMin, Math.min(MAX_ZOOM, zoom * zoomAmount))
+    // Utiliser le zoomMin déjà calculé au lieu de recalculer dynamiquement
+    const nextZoom = Math.max(zoomMin, Math.min(MAX_ZOOM, zoom * zoomAmount))
 
     // Calculer le nouvel offset pour maintenir wx,wy sous la souris
     let newOffset = {
       x: mouseX - wx * nextZoom,
       y: mouseY - wy * nextZoom
-    }    // Appliquer le clamping pour s'assurer que les bords de l'image restent à l'extérieur du canvas
+    }// Appliquer le clamping pour s'assurer que les bords de l'image restent à l'extérieur du canvas
     newOffset = clampOffset(newOffset, nextZoom, img, canvasDims)
 
     setZoom(nextZoom)
