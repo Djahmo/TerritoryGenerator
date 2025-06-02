@@ -162,3 +162,34 @@ export const findOptimalOrientation = (
 
   return best
 }
+
+/**
+ * Convertit les coordonnées de crop d'une image en nouveau bbox géographique
+ * Les coordonnées de crop sont supposées être relatives (entre 0 et 1)
+ */
+export const cropToBbox = (
+  originalBbox: [number, number, number, number],
+  cropData: {
+    x: number; // Position relative X (0-1)
+    y: number; // Position relative Y (0-1)
+    width: number; // Largeur relative (0-1)
+    height: number; // Hauteur relative (0-1)
+    imageWidth: number;
+    imageHeight: number;
+  }
+): [number, number, number, number] => {
+  const [minLon, minLat, maxLon, maxLat] = originalBbox;
+
+  // Calculer les nouvelles coordonnées géographiques en utilisant les coordonnées relatives
+  const bboxWidth = maxLon - minLon;
+  const bboxHeight = maxLat - minLat;
+
+  const newMinLon = minLon + (cropData.x * bboxWidth);
+  const newMaxLat = maxLat - (cropData.y * bboxHeight); // Y inversé car les coordonnées image sont inversées
+  const newMaxLon = newMinLon + (cropData.width * bboxWidth);
+  const newMinLat = newMaxLat - (cropData.height * bboxHeight);
+
+  const result = [newMinLon, newMinLat, newMaxLon, newMaxLat] as [number, number, number, number];
+
+  return result;
+};

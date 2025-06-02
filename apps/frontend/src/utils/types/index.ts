@@ -69,6 +69,9 @@ export type Territory = {
   original?: string
   originalLarge?: string
 
+  // Bbox actuel pour l'image large (pour les opérations de crop)
+  currentBboxLarge?: [number, number, number, number]
+
   // Layers de dessin pour chaque format
   paintLayersImage?: PaintLayer[]
   paintLayersLarge?: PaintLayer[]

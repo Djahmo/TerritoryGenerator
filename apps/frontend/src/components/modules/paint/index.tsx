@@ -16,20 +16,29 @@ import {
   TextInputComponent
 } from './tools';
 import SeparatorX from '../../ui/SeparatorX';
+import Cropper from './components/Cropper';
 
 interface PaintProps {
   src?: string;
   layers?: PaintLayer[];
   onSave?: (layers: PaintLayer[], compositeImage?: string) => void;
+  onCrop?: (cropData: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    imageWidth: number;
+    imageHeight: number;
+  }) => void;
   isLarge?: boolean;
 }
 
-const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) => {
-  // Note: isLarge parameter is available for future use (e.g., different UI behaviors for large view)
-  void isLarge; // Prevent unused variable warning
+const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
+
+  const [onCropping, setOnCropping] = useState(false);
 
   const {
     objects,
@@ -89,65 +98,52 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     setDraggedObjects,
     dragOffset,
     setDragOffset
-  } = useDrawingState();  const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
+  } = useDrawingState();
+
+  const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
   const [currentMode, setCurrentMode] = useState<{ isLarge: boolean; layersLoaded: boolean }>({
     isLarge: false,
     layersLoaded: false
   });
-    // Effet pour charger les layers existants
-  useEffect(() => {
-    console.log('[Paint] useEffect layers', {
-      layers,
-      isLarge,
-      currentMode,
-      objects: objects.length
-    });
 
-    // Reset layers when switching between normal/large modes
+  useEffect(() => {
     if (currentMode.isLarge !== isLarge) {
       setCurrentMode({ isLarge, layersLoaded: false });
       setObjects([]);
-      // Ne pas faire de return ici - continuer pour charger les layers du nouveau mode
     }
 
-    // Load layers if they exist and haven't been loaded for current mode OR if mode just changed
     const shouldLoadLayers = layers && layers.length > 0 &&
       (!currentMode.layersLoaded || currentMode.isLarge !== isLarge);
 
     if (shouldLoadLayers) {
-      console.log('[Paint] Chargement des layers', layers);
       const drawObjects = layers
         .map(LayerService.convertLayerToDrawObject)
         .filter((obj): obj is DrawObject => obj !== null);
 
-      console.log('[Paint] Conversion des layers en drawObjects', drawObjects);
       setObjects(drawObjects);
       addToHistory(drawObjects);
       setCurrentMode({ isLarge, layersLoaded: true });
     } else if (!layers || layers.length === 0) {
-      console.log('[Paint] Aucun layer à charger');
       setCurrentMode({ isLarge, layersLoaded: false });
-      // Ne pas effacer les objets existants si l'utilisateur a déjà dessiné
-      // Seulement les effacer si nous n'avons pas d'objets actuels
       if (objects.length === 0) {
         setObjects([]);
       }
     }
   }, [layers, setObjects, addToHistory, isLarge]);
 
-  // Image loading effect
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
     if (!src) {
-      // Pas d'image source, initialiser avec dimensions par défaut
       backgroundImageRef.current = null;
-      setImg(null);      const containerRect = container.getBoundingClientRect();
+      setImg(null);
+
+      const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      const calculatedHeight = Math.round(canvasWidth * 0.75); // Ratio 4:3 par défaut
-      const canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
+      const calculatedHeight = Math.round(canvasWidth * 0.75);
+      const canvasHeight = Math.min(calculatedHeight, 700);
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -159,42 +155,40 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       setZoomMin(1);
       setOffset({ x: 0, y: 0 });
       return;
-    }    const img = new Image();
+    }
+
+    const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       backgroundImageRef.current = img;
       setImg(img);
 
       const containerRect = container.getBoundingClientRect();
-      const canvasWidth = containerRect.width;      // Calculer les dimensions en tenant compte de la limite de hauteur
+      const canvasWidth = containerRect.width;
+
       let canvasHeight, zoomMin;
-        // IMPORTANT: Limitation de hauteur SEULEMENT pour les images portrait (height > width)
-        if (img.height > 700 && img.height > img.width) {
-        // Image portrait très haute : limiter la hauteur à 700px
+
+      if (img.height > 700 && img.height > img.width) {
         canvasHeight = 700;
-        // Pour les images portrait, on veut que l'image rentre dans le canvas, pas qu'elle le couvre
         const heightRatio = img.height / 700;
         const adjustedImgWidth = img.width / heightRatio;
-
-        // Le zoom minimum est basé sur le fait que l'image doit rentrer dans le canvas
         zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
       } else {
-        // Image normale : utiliser le ratio original mais limiter la hauteur
         const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
         canvasHeight = Math.min(calculatedHeight, 700);
-        // Pour les images normales, on garde le comportement standard
         zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
       }
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
-      canvas.height = canvasHeight;      canvas.style.width = `${canvasWidth}px`;
+      canvas.height = canvasHeight;
+
+      canvas.style.width = `${canvasWidth}px`;
       canvas.style.height = `${canvasHeight}px`;
 
       setZoomMin(zoomMin);
       setZoom(zoomMin);
 
-      // Centre l'image lors du chargement initial
       const scaledImgWidth = img.width * zoomMin;
       const scaledImgHeight = img.height * zoomMin;
 
@@ -206,11 +200,12 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
     img.onerror = () => {
       backgroundImageRef.current = null;
-      setImg(null);      // En cas d'erreur, utiliser les dimensions par défaut
+      setImg(null);
+
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
       const calculatedHeight = Math.round(canvasWidth * 0.75);
-      const canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
+      const canvasHeight = Math.min(calculatedHeight, 700);
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -226,7 +221,6 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     img.src = src;
   }, [src, setCanvasDims, setImg, setZoom, setZoomMin, setOffset]);
 
-
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;
@@ -235,21 +229,20 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      let canvasHeight;      // Si on a une image, calculer les dimensions appropriées
+      let canvasHeight;
+
       if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
 
         if (img.height > 700 && img.height > img.width) {
-          // Image portrait très haute : limiter la hauteur à 700px
           canvasHeight = 700;
         } else {
-          // Image normale : utiliser le ratio original mais limiter la hauteur
           const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
           canvasHeight = Math.min(calculatedHeight, 700);
         }
       } else {
         const calculatedHeight = Math.round(canvasWidth * 0.75);
-        canvasHeight = Math.min(calculatedHeight, 700); // Limiter à 700px max
+        canvasHeight = Math.min(calculatedHeight, 700);
       }
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
@@ -257,17 +250,17 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       canvas.height = canvasHeight;
 
       canvas.style.width = `${canvasWidth}px`;
-      canvas.style.height = `${canvasHeight}px`;      if (backgroundImageRef.current) {
+      canvas.style.height = `${canvasHeight}px`;
+
+      if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
         let zoomMin;
-          if (img.height > 700 && img.height > img.width) {
-          // Image portrait très haute : calculer le zoom basé sur la hauteur limitée
+
+        if (img.height > 700 && img.height > img.width) {
           const heightRatio = img.height / 700;
           const adjustedImgWidth = img.width / heightRatio;
-          // Pour les images portrait, on veut que l'image rentre dans le canvas
           zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
         } else {
-          // Image normale : utiliser le calcul standard (l'image doit couvrir le canvas)
           zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
         }
 
@@ -275,7 +268,6 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
         if (zoom < zoomMin) {
           setZoom(zoomMin);
-          // Centrer l'image quand on réajuste le zoom
           const scaledImgWidth = img.width * zoomMin;
           const scaledImgHeight = img.height * zoomMin;
 
@@ -284,7 +276,6 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
             y: (canvasHeight - scaledImgHeight) / 2
           });
         }
-        // Si le zoom actuel est valide, on garde l'offset existant
       } else {
         setZoom(1);
         setZoomMin(1);
@@ -293,9 +284,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     };
 
     window.addEventListener('resize', handleResize);
-
     handleResize();
-
     return () => window.removeEventListener('resize', handleResize);
   }, [setZoom, setZoomMin, setOffset, setCanvasDims, zoom]);
 
@@ -377,7 +366,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
     if (isCtrlClick || isMiddleClick) {
       return;
-    }    if (selectedTool === 'selection' && selectedObjects.length > 0 && !isRightClick) {
+    }
+
+    if (selectedTool === 'selection' && selectedObjects.length > 0 && !isRightClick) {
       const isOverSelected = selectedObjects.some(index =>
         index < objects.length && isPointInSelectionBounds(point, objects[index])
       );
@@ -389,14 +380,14 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
         setStartPoint(point);
         return;
       }
-    }    setIsDrawing(true);
+    }
+
+    setIsDrawing(true);
     setStartPoint(point);
 
-    // Utilisation de la factory function pour créer l'outil
     const newShape = createToolShape(selectedTool, colorToUse, strokeWidth, fontSize, point);
 
     if (selectedTool === 'parking') {
-      // Cas spécial pour le parking - ajout immédiat aux objets
       if (newShape) {
         const newObjects = [...objects, newShape];
         setObjects(newObjects);
@@ -406,13 +397,11 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
       setStartPoint(null);
       setCurrentShape(null);
     } else if (selectedTool === 'text') {
-      // Cas spécial pour le texte - configuration de l'input
       setCurrentShape(newShape);
       setTextInput('');
       setTextInputScreenPos(worldToScreen(point.x, point.y));
       setShowTextInput(true);
     } else {
-      // Cas standard pour tous les autres outils
       setCurrentShape(newShape);
     }
   }, [selectedTool, selectedColor, secondaryColor, strokeWidth, fontSize, objects, selectedObjects, getMousePos, setIsDrawing, setStartPoint, setCurrentShape, setObjects, addToHistory, setTextInput, setShowTextInput, worldToScreen, setTextInputScreenPos, setIsDragging, setDraggedObjects, setDragOffset]);
@@ -423,15 +412,15 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     const point = getMousePos(e);
     setCursorPosition(point);
 
-    // Handle dragging selected objects
     if (isDragging && startPoint) {
       const deltaX = point.x - startPoint.x;
       const deltaY = point.y - startPoint.y;
       setDragOffset({ x: deltaX, y: deltaY });
       return;
-    }    if (!isDrawing || !currentShape || !startPoint) return;
+    }
 
-    // Utilisation de la factory function pour mettre à jour l'outil
+    if (!isDrawing || !currentShape || !startPoint) return;
+
     const updatedShape = updateToolShape(selectedTool, currentShape, point);
     if (updatedShape) {
       setCurrentShape(updatedShape);
@@ -467,8 +456,10 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     if (selectedTool === 'selection' && currentShape.type === 'selection') {
       const selectedObjs = SelectionTool.getSelectedObjects(currentShape, objects);
       const selectedIndices = selectedObjs.map(obj => objects.indexOf(obj)).filter(index => index !== -1);
-      setSelectedObjects(selectedIndices);    } else if (selectedTool === 'text' && currentShape.type === 'text') {
-      return;    } else {
+      setSelectedObjects(selectedIndices);
+    } else if (selectedTool === 'text' && currentShape.type === 'text') {
+      return;
+    } else {
       const newObjects = [...objects, currentShape];
       setObjects(newObjects);
       addToHistory(newObjects);
@@ -476,14 +467,12 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
 
     setCurrentShape(null);
     setStartPoint(null);
-  }, [isDrawing, isDragging, currentShape, selectedTool, objects, draggedObjects, dragOffset, selectedObjects, setIsDrawing, setObjects, addToHistory, setSelectedObjects, setCurrentShape, setStartPoint, setIsDragging, setDraggedObjects, setDragOffset]);  // Function to determine cursor style
+  }, [isDrawing, isDragging, currentShape, selectedTool, objects, draggedObjects, dragOffset, selectedObjects, setIsDrawing, setObjects, addToHistory, setSelectedObjects, setCurrentShape, setStartPoint, setIsDragging, setDraggedObjects, setDragOffset]);
 
   const getCursorStyle = useCallback(() => {
-    // Panning has highest priority
     if (isPanning) return 'grabbing';
+    if (isDragging) return 'grabbing';
 
-    // Object dragging has second priority
-    if (isDragging) return 'grabbing';    // Selection tool: show 'grab' cursor when hovering over selected objects
     if (selectedTool === 'selection' && selectedObjects.length > 0 && cursorPosition) {
       const isOverSelected = selectedObjects.some(index =>
         index < objects.length && isPointInSelectionBounds(cursorPosition, objects[index])
@@ -495,7 +484,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
   }, [isPanning, isDragging, selectedTool, selectedObjects, cursorPosition, objects]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.ctrlKey)) { // Middle mouse or Ctrl+left click
+    if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
       e.preventDefault();
       handlePanStart(e);
     }
@@ -512,7 +501,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     if (isPanning) {
       handlePanEnd();
     }
-  }, [isPanning, handlePanEnd]);  const handleWheelEvent = useCallback((e: React.WheelEvent) => {
+  }, [isPanning, handlePanEnd]);
+
+  const handleWheelEvent = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -521,7 +512,6 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     const scaleX = canvasDims.w / rect.width;
     const scaleY = canvasDims.h / rect.height;
 
-    // Coordonnées dans l'espace du canvas (avant transformation zoom/offset)
     const canvasX = (e.clientX - rect.left) * scaleX;
     const canvasY = (e.clientY - rect.top) * scaleY;
     handleWheel(e.nativeEvent, canvasX, canvasY);
@@ -560,52 +550,43 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
     setObjects(filteredObjects);
     setSelectedObjects([]);
     addToHistory(filteredObjects);
-  }, [objects, selectedObjects, setObjects, setSelectedObjects, addToHistory]);  const handleExport = useCallback(async () => {
+  }, [objects, selectedObjects, setObjects, setSelectedObjects, addToHistory]);
+
+  const handleExport = useCallback(async () => {
     if (!onSave) return;
 
     try {
-      // Convertir les DrawObjects en PaintLayers
       const paintLayers = objects
         .map(LayerService.convertDrawObjectToLayer)
         .filter((layer): layer is PaintLayer => layer !== null);
 
-      // Créer l'image composite directement ici
       const canvas = canvasRef.current;
       if (!canvas) {
         onSave(paintLayers);
         return;
       }
 
-      // Créer un canvas temporaire pour l'image composite
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d')!;
 
-      // Utiliser les dimensions de l'image originale si disponible
       if (img) {
         tempCanvas.width = img.width;
         tempCanvas.height = img.height;
-        // Dessiner l'image de base
         tempCtx.drawImage(img, 0, 0);
       } else {
-        // Pas d'image de base, utiliser les dimensions du canvas
         tempCanvas.width = canvasDims.w;
         tempCanvas.height = canvasDims.h;
       }
 
-      // Dessiner tous les objets sur le canvas temporaire en utilisant les outils existants
       objects.forEach((obj) => {
-        if (obj.type === 'selection') return; // Ignorer les sélections
+        if (obj.type === 'selection') return;
         drawToolShape(tempCtx, obj);
       });
 
-      // Convertir en base64
       const compositeImage = tempCanvas.toDataURL('image/png');
-
-      // Passer les layers ET l'image composite
       onSave(paintLayers, compositeImage);
     } catch (error) {
       console.error('[Paint] Error exporting canvas:', error);
-      // En cas d'erreur, sauvegarder au moins les layers
       const paintLayers = objects
         .map(LayerService.convertDrawObjectToLayer)
         .filter((layer): layer is PaintLayer => layer !== null);
@@ -623,14 +604,27 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
   const handleUndo = useCallback(() => {
     handleHistoryChange(undo());
   }, [handleHistoryChange, undo]);
+
   const handleRedo = useCallback(() => {
     handleHistoryChange(redo());
   }, [handleHistoryChange, redo]);
 
-  // Gestion des raccourcis clavier
+  const handleCropApply = useCallback((cropData: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    imageWidth: number;
+    imageHeight: number;
+  }) => {
+    if (onCrop) {
+      onCrop(cropData);
+    }
+    setOnCropping(false);
+  }, [onCrop]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore si l'utilisateur tape dans un input text
       if (showTextInput) return;
 
       if (e.ctrlKey || e.metaKey) {
@@ -638,38 +632,30 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
           case 'z':
             e.preventDefault();
             if (e.shiftKey) {
-              // Ctrl+Shift+Z = Redo (alternative)
               if (canRedo) handleRedo();
             } else {
-              // Ctrl+Z = Undo
               if (canUndo) handleUndo();
             }
             break;
           case 'y':
-            // Ctrl+Y = Redo
             e.preventDefault();
             if (canRedo) handleRedo();
             break;
         }
       }
 
-      // Échapper pour désélectionner
       if (e.key === 'Escape') {
         setSelectedObjects([]);
         setSelectedTool('selection');
       }
 
-      // Supprimer les objets sélectionnés
       if (e.key === 'Delete' && selectedObjects.length > 0) {
         handleClear();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showTextInput, canUndo, canRedo, handleUndo, handleRedo, selectedObjects, handleClear, setSelectedObjects, setSelectedTool]);
 
   return (
@@ -758,6 +744,14 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, isLarge = false }) =
           onRedo={handleRedo}
           onClear={handleClear}
           onExport={handleExport}
+          isLarge={isLarge}
+          onGoCrop={() => setOnCropping(true)}
+        />
+        <Cropper
+          src={src!}
+          open={onCropping}
+          onClose={() => setOnCropping(false)}
+          onApply={handleCropApply}
         />
       </div>
     </div>

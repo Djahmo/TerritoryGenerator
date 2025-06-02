@@ -5,15 +5,24 @@ interface ActionButtonsProps {
   canUndo: boolean;
   canRedo: boolean;
   selectedObjectsLength: number;
+  isLarge: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
   onExport: () => void;
+  onGoCrop: () => void;
 }
 
-export const ActionButtons: React.FC<ActionButtonsProps> = ({ canUndo, canRedo, selectedObjectsLength, onUndo, onRedo, onClear, onExport, }) => {
+export const ActionButtons: React.FC<ActionButtonsProps> = ({ canUndo, canRedo, isLarge, selectedObjectsLength, onUndo, onRedo, onClear, onExport, onGoCrop }) => {
   return (
     <div className="space-y-2">
+      {isLarge && <button
+        onClick={onGoCrop}
+        className="p-2 rounded border cursor-pointer w-full border-accent/50 hover:bg-accent/10 text-accent flex items-center justify-center"
+        title="Recadrer"
+      >
+        <span className="text-sm">Recadrer</span>
+      </button>}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={onUndo}

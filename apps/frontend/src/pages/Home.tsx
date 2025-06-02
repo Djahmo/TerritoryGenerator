@@ -16,9 +16,7 @@ const Home: FC = () => {
   const { cache, updateGpx, updateTerritories } = useTerritoryCache()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
-
   useEffect(() => {
-    console.log("Cache loaded:", cache)
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
     }

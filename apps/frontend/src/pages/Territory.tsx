@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
+import { useCallback } from "react"
 import Wrapper from "#/ui/Wrapper"
 import { useTerritoryCache } from "@/hooks/useTerritoryCache"
 import { useGenerate } from "@/hooks/useGenerate"
@@ -10,12 +11,15 @@ import Input from "#/ui/Input"
 import Modal from "#/ui/Modal"
 import type { PaintLayer } from "%/types"
 import { toast } from "sonner"
+import { cropToBbox, calculateBoundingBox } from "@/utils/geometry"
+import { useConfig } from "@/hooks/useConfig"
 
 const Territory = () => {
   const { num } = useParams<{ num: string }>()
   const { t } = useTranslation()
   const { cache, updateTerritories, updateTerritory } = useTerritoryCache()
-  const { generateThumbnailFromImage, generateLargeImage, generateStandardImage } = useGenerate()
+  const { generateThumbnailFromImage, generateLargeImage, generateLargeImageWithCrop } = useGenerate()
+  const { config, PHI } = useConfig()
   const navigate = useNavigate()
   const territory = cache?.territories?.find(t => t.num === num)
   const [inputName, setInputName] = useState<string>("")
@@ -24,20 +28,9 @@ const Territory = () => {
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false)
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false)
   const [paintKey, setPaintKey] = useState<number>(0)
-
+  const [isGeneratingCrop, setIsGeneratingCrop] = useState<boolean>(false)
   useEffect(() => {
     if (territory) {
-      console.log('[Territory] État actuel du territoire:', {
-        num: territory.num,
-        hasMiniature: !!territory.miniature,
-        hasOriginal: !!territory.original,
-        hasOriginalLarge: !!territory.originalLarge,
-        hasImage: !!territory.image,
-        hasLarge: !!territory.large,
-        paintLayersImageCount: territory.paintLayersImage?.length || 0,
-        paintLayersLargeCount: territory.paintLayersLarge?.length || 0,
-        isDefault: territory.isDefault
-      });
       setInputName(territory.name);
     }
   }, [territory])
@@ -49,17 +42,17 @@ const Territory = () => {
   const handleToggleLarge = async () => {
     if (!territory) return
 
-    // Si on passe en mode large et qu'il n'y a pas encore d'image large, on la génère
     if (!isLarge && !territory.originalLarge) {
       setIsGeneratingLarge(true)
       try {
         const largeImage = await generateLargeImage(territory)
+        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI)
+
         updateTerritory(num!, {
           originalLarge: largeImage,
-          large: largeImage
-        })
-      } catch (error) {
-        console.error('Erreur lors de la génération du plan large:', error)
+          large: largeImage,
+          currentBboxLarge: initialBboxLarge
+        })      } catch (error) {
         toast.error(t("p.territory.generate_large_error"))
         setIsGeneratingLarge(false)
         return
@@ -72,51 +65,34 @@ const Territory = () => {
   const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
     if (!territory) return
 
-    try {
-      if (!compositeImage) {
-        console.error('[Territory] Pas d\'image composite fournie')
+    try {      if (!compositeImage) {
         return;
       }
 
-      console.log('[handleSave] Début de la sauvegarde', {
-        isLarge,
-        layersCount: layers.length,
-        compositeImageExists: !!compositeImage
-      });      let updates: any = {};
+      let updates: any = {};
 
       if (isLarge) {
-        // Pour les plans larges, on ne touche pas à la miniature
         updates = {
           paintLayersLarge: layers,
           large: compositeImage,
-          // Préserver les layers et l'image du plan standard
           paintLayersImage: territory.paintLayersImage || [],
           image: territory.image,
           miniature: territory.miniature
         };
-        console.log('[handleSave] Mise à jour plan large', updates);
       } else {
-        // Pour les plans serrés, on génère et met à jour la miniature
-        console.log('[handleSave] Génération de miniature en cours...');
         const miniature = await generateThumbnailFromImage(compositeImage);
         updates = {
           paintLayersImage: layers,
           image: compositeImage,
           miniature: miniature,
-          // Préserver les layers et l'image du plan large
           paintLayersLarge: territory.paintLayersLarge || [],
           large: territory.large,
           originalLarge: territory.originalLarge
         };
-        console.log('[handleSave] Mise à jour plan standard avec miniature', updates);
       }
 
-      console.log('[handleSave] Mise à jour du territoire:', num, updates);
       updateTerritory(num!, updates);
-      toast.success(t("p.territory.save_success"))
-    } catch (error) {
-      console.error('[Territory] Erreur lors de la sauvegarde:', error)
-      // En cas d'erreur, sauvegarder au moins les layers
+      toast.success(t("p.territory.save_success"))    } catch (error) {
       if (isLarge) {
         updateTerritory(num!, { paintLayersLarge: layers })
       } else {
@@ -124,42 +100,31 @@ const Territory = () => {
       }
     }
   }
+
   const handleRegenerate = async () => {
     if (!territory) return
 
     setIsRegenerating(true)
-    try {      if (isLarge) {
-        // Régénération du plan large
+    try {
+      if (isLarge) {
         const largeImage = await generateLargeImage(territory)
-        console.log('[handleRegenerate] Régénération plan large, données à mettre à jour:', {
-          originalLarge: largeImage.length > 50 ? 'Image OK' : 'Image problématique',
-          paintLayersLarge: []
-        });
+        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI)
+
         updateTerritory(num!, {
           originalLarge: largeImage,
           large: largeImage,
+          currentBboxLarge: initialBboxLarge,
           paintLayersLarge: [],
-          // Préserver les données du plan standard
           paintLayersImage: territory.paintLayersImage || [],
           image: territory.image,
           miniature: territory.miniature
         })
         toast.success(t("p.territory.regenerate_large_success"))
       } else {
-        // Régénération de l'image standard
-        const standardImage = await generateStandardImage(territory)
-        const miniature = await generateThumbnailFromImage(standardImage)
-        console.log('[handleRegenerate] Régénération plan standard, données à mettre à jour:', {
-          original: standardImage.length > 50 ? 'Image OK' : 'Image problématique',
-          miniature: miniature.length > 50 ? 'Miniature OK' : 'Miniature problématique',
-          paintLayersImage: []
-        });
         updateTerritory(num!, {
-          original: standardImage,
-          image: standardImage,
-          miniature: miniature,
+          original: territory.original,
+          image: territory.original || "",
           paintLayersImage: [],
-          // Préserver les données du plan large
           paintLayersLarge: territory.paintLayersLarge || [],
           large: territory.large,
           originalLarge: territory.originalLarge
@@ -167,22 +132,70 @@ const Territory = () => {
         toast.success(t("p.territory.regenerate_success"))
       }
 
-      // Forcer la réinitialisation du composant Paint
-      setPaintKey(prev => prev + 1)
-    } catch (error) {
-      console.error(`Erreur lors de la régénération de l'image:`, error)
+      setPaintKey(prev => prev + 1)    } catch (error) {
       toast.error(t("p.territory.regenerate_error"))
-    } finally {
-      setIsRegenerating(false)
-      // Fermer la modale de confirmation
+    } finally {setIsRegenerating(false)
       setShowConfirmation(false)
     }
   }
 
-  // Fonction pour demander confirmation avant de régénérer
-  const confirmRegeneration = () => {
-    setShowConfirmation(true)
-  }
+  const handleApplyCrop = useCallback(async (cropData: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    imageWidth: number;
+    imageHeight: number;
+  }) => {
+    if (!territory) {
+      return;
+    }
+
+    setIsGeneratingCrop(true)
+
+    try {
+      let originalBbox: [number, number, number, number];
+
+      if (isLarge && territory.currentBboxLarge) {
+        originalBbox = territory.currentBboxLarge;
+      } else {
+        originalBbox = calculateBoundingBox(territory.polygon, isLarge, config, PHI);
+      }
+
+      const newBbox = cropToBbox(originalBbox, cropData)
+      const croppedImage = await generateLargeImageWithCrop(territory, newBbox)
+
+      if (isLarge) {
+        updateTerritory(num!, {
+          originalLarge: croppedImage,
+          large: croppedImage,
+          currentBboxLarge: newBbox,
+          paintLayersLarge: [],
+          paintLayersImage: territory.paintLayersImage || [],
+          image: territory.image,
+          miniature: territory.miniature
+        })
+        toast.success("Plan large mis à jour avec le crop - contour du territoire redessiné")
+      } else {
+        const miniature = await generateThumbnailFromImage(croppedImage)
+        updateTerritory(num!, {
+          original: croppedImage,
+          image: croppedImage,
+          miniature: miniature,
+          paintLayersImage: [],
+          paintLayersLarge: territory.paintLayersLarge || [],
+          large: territory.large,
+          originalLarge: territory.originalLarge
+        })
+        toast.success("Image mise à jour avec le crop - contour du territoire redessiné")
+      }
+
+      setPaintKey(prev => prev + 1)    } catch (error) {
+      toast.error("Erreur lors de l'application du crop")
+    } finally {
+      setIsGeneratingCrop(false)
+    }
+  }, [territory, isLarge, config, PHI, generateLargeImageWithCrop, generateThumbnailFromImage, updateTerritory, num])
 
   if (!territory)
     return (
@@ -195,9 +208,12 @@ const Territory = () => {
     )
 
   return (
-    <Wrapper className="mt-4 px-4 pb-8 flex flex-col items-center gap-6 overflow-y-auto h-full">      <h1 className="text-3xl font-bold flex">
-      <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
-      <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du térritoire" className="mb-0" />    </h1>
+    <Wrapper className="mt-4 px-4 pb-8 flex flex-col items-center gap-6 overflow-y-auto h-full">
+      <h1 className="text-3xl font-bold flex">
+        <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
+        <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du térritoire" className="mb-0" />
+      </h1>
+
       {/* Boutons pour contrôler l'affichage et régénérer l'image */}
       <div className="flex gap-3 items-center">
         <button
@@ -207,29 +223,24 @@ const Territory = () => {
             ? 'btn-positive'
             : 'btn-neutral'
             } ${isGeneratingLarge ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >{isGeneratingLarge ? (
+        >         {isGeneratingLarge ? (
           <>
             <div className="animate-spin mr-2">⟳</div>
             <span>Génération...</span>
           </>
-        ) : (
-          <div className="flex items-center gap-2 cursor-pointer">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {isLarge
-                ? <path d="M9 9h6v6H9z" /> /* Icône carré (vue standard) */
-                : <path d="M21 21H3V3h18v18z" /> /* Icône cadre (vue élargie) */
-              }
-            </svg>
-            <span>{isLarge ? "Vue standard" : "Vue plan large"}</span>
-          </div>
+        ) : (<div className="flex items-center gap-2 cursor-pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {isLarge ? <path d="M9 9h6v6H9z" /> : <path d="M21 21H3V3h18v18z" />}
+          </svg>
+          <span>{isLarge ? "Plan serré" : "Plan large"}</span>
+        </div>
         )}
         </button>
-        {/* Bouton de régénération d'image */}
+
         <button
-          onClick={confirmRegeneration}
+          onClick={() => setShowConfirmation(true)}
           disabled={isRegenerating}
-          className={`btn-accent
-            ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`btn-warning ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isRegenerating ? (
             <>
@@ -237,7 +248,7 @@ const Territory = () => {
               <span>Régénération...</span>
             </>
           ) : (
-            <div className="flex items-center gap-2 cursor-pointer">
+            <div className="flex items-center gap-2 cursor-pointer btn-neutral">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
               </svg>
@@ -246,14 +257,26 @@ const Territory = () => {
           )}
         </button>
       </div>
-
       <div className="w-full flex justify-center">
-        <div className=" rounded-lg overflow-hidden border border-muted/50 shadow-xl max-w-[90vw] md:max-w-[60vw] w-full flex justify-center items-center dark:bg-darknd bg-lightnd" style={{ minHeight: 100 }} >
+        <div className="relative rounded-lg overflow-hidden border border-muted/50 shadow-xl max-w-[90vw] md:max-w-[60vw] w-full flex justify-center items-center dark:bg-darknd bg-lightnd" style={{ minHeight: 100 }} >
+          {/* Overlay de chargement pour le crop */}
+          {isGeneratingCrop && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
+              <div className="bg-lightnd dark:bg-darknd p-6 rounded-lg shadow-lg flex flex-col items-center gap-3">
+                <div className="animate-spin w-8 h-8 border-4 border-positive border-t-transparent rounded-full"></div>
+                <p className="text-sm font-medium text-muted">
+                  Application du crop et redessin du contour...
+                </p>
+              </div>
+            </div>
+          )}
+
           <Paint
             key={paintKey}
             src={isLarge ? (territory.originalLarge || territory.original || "") : (territory.original || "")}
             layers={isLarge ? (territory.paintLayersLarge || []) : (territory.paintLayersImage || [])}
             onSave={handleSave}
+            onCrop={handleApplyCrop}
             isLarge={isLarge} />
         </div>
       </div>
@@ -264,19 +287,21 @@ const Territory = () => {
           <h3 className="text-xl font-bold">{t("territory.confirm_regenerate_title", "Confirmer la régénération")}</h3>
           <p className="text-muted">
             {isLarge
-              ? t("p.territory.confirm_regenerate_large.")
+              ? t("p.territory.confirm_regenerate_large")
               : t("p.territory.confirm_regenerate_standard")}
           </p>
           <div className="flex justify-end gap-3 mt-2">
             <button
               onClick={() => setShowConfirmation(false)}
-              className="btn-neutral">
-              {t("common.cancel", "Annuler")}
+              className="btn-neutral"
+            >
+              Annuler
             </button>
             <button
               onClick={handleRegenerate}
-              className="btn-positive">
-              {t("common.confirm", "Confirmer")}
+              className="btn-positive"
+            >
+              Régénérer
             </button>
           </div>
         </div>

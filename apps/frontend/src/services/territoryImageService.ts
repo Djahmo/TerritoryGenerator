@@ -183,6 +183,75 @@ export class TerritoryImageService {  constructor(
   }
 
   /**
+   * Génère une image large avec un bbox personnalisé (utilisé après cropping)
+   */
+  async generateLargeImageWithCustomBbox(
+    territory: Territory,
+    customBbox: [number, number, number, number],
+    options: ImageGenerationConfig = {}
+  ): Promise<string> {
+    const { contourColor, contourWidth } = {
+      contourColor: this.userConfig.contourColor,
+      contourWidth: this.userConfig.contourWidth,
+      ...options
+    }
+
+    // 1. Utiliser le bbox personnalisé au lieu de calculer
+    const bbox = customBbox
+
+    // 2. Chargement de l'image
+    const url = buildIgnUrl(bbox, this.dimensions.largeRawSize || this.dimensions.rawSize, {
+      baseUrl: this.userConfig.ignApiBaseUrl,
+      layer: this.userConfig.ignApiLayer,
+      format: this.userConfig.ignApiFormat,
+      crs: this.userConfig.ignApiCRS
+    })
+    const mapImage = await loadImageBitmap(
+      url,
+      this.userConfig.networkRetries,
+      this.userConfig.networkDelay
+    )
+
+    // 3. Création du canvas de base
+    const canvas = document.createElement('canvas')
+    const canvasSize = this.dimensions.largeRawSize || this.dimensions.rawSize
+    canvas.width = canvasSize
+    canvas.height = canvasSize
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(mapImage, 0, 0)
+
+    // 4. Redimensionnement direct
+    const finalWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
+    const finalHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight
+    const finalCanvas = cropAndResize(
+      canvas,
+      { x: 0, y: 0, width: canvasSize, height: canvasSize },
+      finalWidth,
+      finalHeight
+    )
+
+    // 5. Transformation du polygone
+    const polygonPixels = territory.polygon.map(coord =>
+      gpsToPixel(coord.lat, coord.lon, bbox, canvasSize)
+    )
+
+    const finalPolygon = polygonPixels.map(([x, y]) => {
+      const xf = (x * finalWidth) / canvasSize
+      const yf = (y * finalHeight) / canvasSize
+      return [xf, yf] as [number, number]
+    })
+
+    // 6. Ajout du masque et du contour
+    const finalCtx = finalCanvas.getContext('2d')!
+    drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
+      planLarge: true
+    })
+    drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
+
+    return finalCanvas.toDataURL('image/png')
+  }
+
+  /**
    * Génère une miniature à partir d'une image existante
    */  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
     const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * this.userConfig.thumbnailWidth)

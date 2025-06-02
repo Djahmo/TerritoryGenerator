@@ -170,11 +170,24 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
     }
   }, [imageService])
 
+  // Fonction pour générer une image large avec un bbox personnalisé (pour le cropping)
+  const generateLargeImageWithCrop = useCallback(async (
+    territory: Territory,
+    customBbox: [number, number, number, number]
+  ): Promise<string> => {
+    try {
+      return await imageService.generateLargeImageWithCustomBbox(territory, customBbox)
+    } catch (error) {
+      throw new Error(`Erreur lors de la génération de l'image croppée: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+    }
+  }, [imageService])
+
   return {
     loading,
     error,
     generateImages,
     generateLargeImage,
+    generateLargeImageWithCrop,
     generateThumbnailFromImage,
     generateStandardImage
   }

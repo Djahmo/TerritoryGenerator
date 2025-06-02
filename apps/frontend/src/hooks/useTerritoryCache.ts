@@ -87,37 +87,13 @@ export const useTerritoryStore = create<State>((set, get) => ({
       console.warn('Erreur lors de la sauvegarde des layers:', error)
     }
   },
-  updateTerritory: (num: string, updates: Partial<Territory>) => {
-    const prev = get().cache
+  updateTerritory: (num: string, updates: Partial<Territory>) => {    const prev = get().cache
     if (!prev) {
       console.warn('updateTerritory: Cache non disponible')
       return
-    }
-
-    console.log('[useTerritoryCache] updateTerritory:', {
-      num,
-      updates,
-      hasMiniature: !!updates.miniature,
-      hasLayers: !!updates.paintLayersImage || !!updates.paintLayersLarge,
-      layersCount: (updates.paintLayersImage?.length || 0) + (updates.paintLayersLarge?.length || 0)
-    })
-
-    const updatedTerritories = prev.territories.map(territory => {
+    }    const updatedTerritories = prev.territories.map(territory => {
       if (territory.num === num) {
-        const updatedTerritory = { ...territory, ...updates }
-        console.log('[useTerritoryCache] Territoire mis à jour:', {
-          beforeUpdate: {
-            hasMiniature: !!territory.miniature,
-            hasPaintLayersImage: !!territory.paintLayersImage && territory.paintLayersImage.length > 0,
-            hasPaintLayersLarge: !!territory.paintLayersLarge && territory.paintLayersLarge.length > 0
-          },
-          afterUpdate: {
-            hasMiniature: !!updatedTerritory.miniature,
-            hasPaintLayersImage: !!updatedTerritory.paintLayersImage && updatedTerritory.paintLayersImage.length > 0,
-            hasPaintLayersLarge: !!updatedTerritory.paintLayersLarge && updatedTerritory.paintLayersLarge.length > 0
-          }
-        })
-        return updatedTerritory
+        return { ...territory, ...updates }
       }
       return territory
     })
@@ -128,12 +104,10 @@ export const useTerritoryStore = create<State>((set, get) => ({
       lastUpdate: Date.now()
     }
 
-    console.log('Nouveau cache:', newCache)
     set({ cache: newCache })
 
     try {
       idbSet(CACHE_KEY, newCache)
-      console.log('Cache sauvegardé en IndexedDB')
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du territoire:', error)
     }

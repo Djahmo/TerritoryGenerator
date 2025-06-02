@@ -12,10 +12,8 @@ export class LayerService {
     return `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
-
   static convertDrawObjectToLayer(drawObject: DrawObject): PaintLayer | null {
     if (!drawObject) return null
-    console.log('[LayerService] Converting DrawObject to Layer:', drawObject);
     const baseLayer = {
       id: LayerService.generateLayerId(drawObject.type),
       type: drawObject.type as PaintLayer['type'],
@@ -110,10 +108,8 @@ export class LayerService {
 
   /**
    * Convertit un PaintLayer en DrawObject
-   */
-  static convertLayerToDrawObject(layer: PaintLayer): DrawObject | null {
+   */  static convertLayerToDrawObject(layer: PaintLayer): DrawObject | null {
     if (!layer) return null
-    console.log('[LayerService] Converting Layer to DrawObject:', layer);
 
     const baseObject = {
       type: layer.type,
