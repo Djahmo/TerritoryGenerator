@@ -74,12 +74,12 @@ export type Config = {
 const defaultConfig: Config = {
   // Configuration du canvas/papier
   ppp: 250,
-  ratioX: 1.41,
+  ratioX: 1.618,
   ratioY: 1,
   // Configuration pour les plans larges
-  largeRatioX: 1.78, // Défaut à 16:9
-  largeRatioY: 1,
-  largeFactor: 0.2, // Valeur par défaut utilisée précédemment
+  largeRatioX: 1, // Défaut à 16:9
+  largeRatioY: 1.618,
+  largeFactor: 0.2,
   palette: [
     "rgba(0,0,0,1)",       // Noir
     "rgba(255,0,0,1)",     // Rouge
@@ -103,7 +103,7 @@ const defaultConfig: Config = {
   // Configuration réseau
   networkRetries: 3,
   networkDelay: 1000,
-  ignApiRateLimit: 40, // 40ms entre chaque requête vers l'API IGN pour plus de sécurité
+  ignApiRateLimit: 40,
 
   // Configuration API IGN
   ignApiBaseUrl: 'https://data.geopf.fr/wms-r',
@@ -219,7 +219,6 @@ export const useConfig = () => {
     finalWidth,
     finalHeight,
     rawSize,
-    // Ajouter les dimensions pour les plans larges
     largeFinalWidth,
     largeFinalHeight,
     largeRawSize,

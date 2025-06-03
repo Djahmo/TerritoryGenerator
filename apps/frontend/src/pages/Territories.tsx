@@ -22,7 +22,7 @@ const Territories: FC = () => {
       navigate('/')
     }
   }, [cache, navigate])
-  
+
   const handleRename = (num: string, name: string) => {
     const updatedTerritorys = territorys.map(t => t.num === num ? { ...t, name } : t)
     setTerritorys(updatedTerritorys)
@@ -35,7 +35,7 @@ const Territories: FC = () => {
 
       {!!territorys.length && (
         <div className='flex items-center gap-2 w-full'>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} type='text' Icon={Search} placeholder='Nom ou numéro du térritoire' className='w-full' />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} type='text' Icon={Search} placeholder='Nom ou numéro du territoire' className='w-full' />
           <button
             className="btn-positive w-60 mt-2"
             onClick={() => handleGpxDownload(territorys)}

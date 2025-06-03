@@ -26,15 +26,13 @@ const Configuration = () => {
 
   // Ratios prédéfinis avec noms
   const predefinedRatios = [
-    { name: 'Papier A4 paysage', value: '1.41:1', ratioX: 1.41, ratioY: 1 },
-    { name: 'Papier A4 portrait', value: '1:1.41', ratioX: 1, ratioY: 1.41 },
-    { name: 'Écran 16:9', value: '16:9', ratioX: 1.78, ratioY: 1 },
-    { name: 'Écran 4:3', value: '4:3', ratioX: 1.33, ratioY: 1 },
-    { name: 'Cinéma 21:9', value: '21:9', ratioX: 2.33, ratioY: 1 },
-    { name: 'Carré', value: '1:1', ratioX: 1, ratioY: 1 },
-    { name: 'Ratio d\'or', value: 'φ:1', ratioX: 1.618, ratioY: 1 },
-    { name: 'Photo 3:2', value: '3:2', ratioX: 1.5, ratioY: 1 },
-    { name: 'Instagram story', value: '9:16', ratioX: 9 / 16, ratioY: 1 }
+    { name: 'Papier paysage', value: '1.41:1', ratioX: 1.41, ratioY: 1 },
+    { name: 'Papier portrait', value: '1:1.41', ratioX: 1, ratioY: 1.41 },
+    { name: 'Écran 16:9 paysage', value: '16:9', ratioX: 1.78, ratioY: 1 },
+    { name: 'Écran 16:9 portrait', value: '9:16', ratioX: 1, ratioY: 1.78 },
+    { name: 'Ratio d\'or paysage', value: 'φ:1', ratioX: 1.618, ratioY: 1 },
+    { name: 'Ratio d\'or portrait', value: '1:φ', ratioX: 1, ratioY: 1.618 },
+    { name: 'Carré', value: '1:1', ratioX: 1, ratioY: 1 }
   ]
   const getCurrentRatioValue = () => {
     const current = predefinedRatios.find(r =>

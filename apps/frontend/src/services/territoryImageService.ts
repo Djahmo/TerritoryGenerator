@@ -180,26 +180,46 @@ export class TerritoryImageService {  constructor(
     drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
 
     return finalCanvas.toDataURL('image/png')
-  }
-
-  /**
+  }  /**
    * Génère une image large avec un bbox personnalisé (utilisé après cropping)
    */
   async generateLargeImageWithCustomBbox(
     territory: Territory,
     customBbox: [number, number, number, number],
-    options: ImageGenerationConfig = {}
+    options: ImageGenerationConfig = {},
+    cropData?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      imageWidth: number;
+      imageHeight: number;
+    }
   ): Promise<string> {
     const { contourColor, contourWidth } = {
       contourColor: this.userConfig.contourColor,
       contourWidth: this.userConfig.contourWidth,
       ...options
+    }    // 1. Utiliser le bbox personnalisé au lieu de calculer
+    const bbox = customBbox    // 2. Calculer le ratio d'aspect du crop
+    let cropAspectRatio: number;
+
+    if (cropData) {
+      // Calculer le ratio basé sur les pixels réels de l'image
+      const cropWidthPixels = cropData.width * cropData.imageWidth;
+      const cropHeightPixels = cropData.height * cropData.imageHeight;
+      cropAspectRatio = cropWidthPixels / cropHeightPixels;
+      console.log('🎯 Using real image crop aspect ratio:', cropAspectRatio, 'from crop pixels:', cropWidthPixels, 'x', cropHeightPixels);
+    } else {
+      // Fallback sur le ratio géographique
+      const [minLon, minLat, maxLon, maxLat] = bbox
+      const bboxWidth = maxLon - minLon
+      const bboxHeight = maxLat - minLat
+      cropAspectRatio = bboxWidth / bboxHeight
+      console.log('🎯 Using geographic aspect ratio:', cropAspectRatio, 'bbox dimensions:', bboxWidth, 'x', bboxHeight)
     }
 
-    // 1. Utiliser le bbox personnalisé au lieu de calculer
-    const bbox = customBbox
-
-    // 2. Chargement de l'image
+    // 3. Chargement de l'image
     const url = buildIgnUrl(bbox, this.dimensions.largeRawSize || this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
       layer: this.userConfig.ignApiLayer,
@@ -212,17 +232,29 @@ export class TerritoryImageService {  constructor(
       this.userConfig.networkDelay
     )
 
-    // 3. Création du canvas de base
+    // 4. Création du canvas de base
     const canvas = document.createElement('canvas')
     const canvasSize = this.dimensions.largeRawSize || this.dimensions.rawSize
     canvas.width = canvasSize
     canvas.height = canvasSize
     const ctx = canvas.getContext('2d')!
-    ctx.drawImage(mapImage, 0, 0)
+    ctx.drawImage(mapImage, 0, 0)    // 5. Calcul des dimensions finales basées sur le ratio du crop
+    // Utiliser une dimension de référence qui s'adapte au crop plutôt qu'à la configuration
+    const referenceDimension = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
+    let finalWidth: number
+    let finalHeight: number
+      // Calculer les dimensions pour maintenir le ratio du crop tout en gardant une taille raisonnable
+    if (cropAspectRatio >= 1) {
+      // Crop plus large que haut (paysage)
+      finalWidth = referenceDimension
+      finalHeight = Math.round(referenceDimension / cropAspectRatio)
+    } else {
+      // Crop plus haut que large (portrait)
+      finalHeight = referenceDimension
+      finalWidth = Math.round(referenceDimension * cropAspectRatio)    }
 
-    // 4. Redimensionnement direct
-    const finalWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
-    const finalHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight
+    console.log('📐 Final dimensions:', finalWidth, 'x', finalHeight, 'ratio:', finalWidth / finalHeight);
+
     const finalCanvas = cropAndResize(
       canvas,
       { x: 0, y: 0, width: canvasSize, height: canvasSize },
@@ -230,7 +262,7 @@ export class TerritoryImageService {  constructor(
       finalHeight
     )
 
-    // 5. Transformation du polygone
+    // 6. Transformation du polygone
     const polygonPixels = territory.polygon.map(coord =>
       gpsToPixel(coord.lat, coord.lon, bbox, canvasSize)
     )
@@ -241,7 +273,7 @@ export class TerritoryImageService {  constructor(
       return [xf, yf] as [number, number]
     })
 
-    // 6. Ajout du masque et du contour
+    // 7. Ajout du masque et du contour
     const finalCtx = finalCanvas.getContext('2d')!
     drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
       planLarge: true

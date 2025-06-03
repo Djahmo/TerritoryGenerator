@@ -29,43 +29,60 @@ const Territory = () => {
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false)
   const [paintKey, setPaintKey] = useState<number>(0)
   const [isGeneratingCrop, setIsGeneratingCrop] = useState<boolean>(false)
+
+  const [isVertical, setIsVertical] = useState<boolean>(false)
   useEffect(() => {
     if (territory) {
       setInputName(territory.name);
     }
   }, [territory])
-
   const handleRename = () => {
     const updatedTerritorys = cache?.territories.map(t => t.num === num ? { ...t, name: inputName } : t)
     if (updatedTerritorys) updateTerritories(updatedTerritorys)
-  }
+  };
+
   const handleToggleLarge = async () => {
-    if (!territory) return
+    if (!territory) return;
 
     if (!isLarge && !territory.originalLarge) {
-      setIsGeneratingLarge(true)
+      setIsGeneratingLarge(true);
       try {
-        const largeImage = await generateLargeImage(territory)
-        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI)
+        const largeImage = await generateLargeImage(territory);
+        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI);
+
+        // Vérifier si l'image est verticale (hauteur > largeur)
+        const img = new Image();
+        img.onload = () => {
+          setIsVertical(img.height > img.width);
+        };
+        img.src = largeImage;
 
         updateTerritory(num!, {
           originalLarge: largeImage,
           large: largeImage,
           currentBboxLarge: initialBboxLarge
-        })      } catch (error) {
-        toast.error(t("p.territory.generate_large_error"))
-        setIsGeneratingLarge(false)
-        return
+        });
+      } catch (error) {
+        toast.error(t("p.territory.generate_large_error"));
+        setIsGeneratingLarge(false);
+        return;
       }
-      setIsGeneratingLarge(false)
+      setIsGeneratingLarge(false);
     }
+    const img = new Image();
+    img.onload = () => {
+      setIsVertical(img.height > img.width);
+      console.log(img.height, img.width)
+    };
+    img.src = territory.originalLarge!;
+    setIsLarge(!isLarge);
+  };
 
-    setIsLarge(!isLarge)
-  }
   const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
-    if (!territory) return
+    if (!territory) return;
 
-    try {      if (!compositeImage) {
+    try {
+      if (!compositeImage) {
         return;
       }
 
@@ -92,7 +109,8 @@ const Territory = () => {
       }
 
       updateTerritory(num!, updates);
-      toast.success(t("p.territory.save_success"))    } catch (error) {
+      toast.success(t("p.territory.save_success"))
+    } catch (error) {
       if (isLarge) {
         updateTerritory(num!, { paintLayersLarge: layers })
       } else {
@@ -109,6 +127,12 @@ const Territory = () => {
       if (isLarge) {
         const largeImage = await generateLargeImage(territory)
         const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI)
+
+        const img = new Image();
+        img.onload = () => {
+          setIsVertical(img.height > img.width);
+        };
+        img.src = largeImage;
 
         updateTerritory(num!, {
           originalLarge: largeImage,
@@ -132,9 +156,11 @@ const Territory = () => {
         toast.success(t("p.territory.regenerate_success"))
       }
 
-      setPaintKey(prev => prev + 1)    } catch (error) {
+      setPaintKey(prev => prev + 1)
+    } catch (error) {
       toast.error(t("p.territory.regenerate_error"))
-    } finally {setIsRegenerating(false)
+    } finally {
+      setIsRegenerating(false)
       setShowConfirmation(false)
     }
   }
@@ -149,9 +175,9 @@ const Territory = () => {
   }) => {
     if (!territory) {
       return;
-    }
+    }    setIsGeneratingCrop(true)
 
-    setIsGeneratingCrop(true)
+    console.log('🔍 Crop data received:', cropData);
 
     try {
       let originalBbox: [number, number, number, number];
@@ -160,10 +186,8 @@ const Territory = () => {
         originalBbox = territory.currentBboxLarge;
       } else {
         originalBbox = calculateBoundingBox(territory.polygon, isLarge, config, PHI);
-      }
-
-      const newBbox = cropToBbox(originalBbox, cropData)
-      const croppedImage = await generateLargeImageWithCrop(territory, newBbox)
+      }      const newBbox = cropToBbox(originalBbox, cropData)
+      const croppedImage = await generateLargeImageWithCrop(territory, newBbox, cropData)
 
       if (isLarge) {
         updateTerritory(num!, {
@@ -190,7 +214,8 @@ const Territory = () => {
         toast.success("Image mise à jour avec le crop - contour du territoire redessiné")
       }
 
-      setPaintKey(prev => prev + 1)    } catch (error) {
+      setPaintKey(prev => prev + 1)
+    } catch (error) {
       toast.error("Erreur lors de l'application du crop")
     } finally {
       setIsGeneratingCrop(false)
@@ -211,7 +236,7 @@ const Territory = () => {
     <Wrapper className="mt-4 px-4 pb-8 flex flex-col items-center gap-6 overflow-y-auto h-full">
       <h1 className="text-3xl font-bold flex">
         <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
-        <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du térritoire" className="mb-0" />
+        <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du territoire" className="mb-0" />
       </h1>
 
       {/* Boutons pour contrôler l'affichage et régénérer l'image */}
@@ -277,7 +302,7 @@ const Territory = () => {
             layers={isLarge ? (territory.paintLayersLarge || []) : (territory.paintLayersImage || [])}
             onSave={handleSave}
             onCrop={handleApplyCrop}
-            isLarge={isLarge} />
+            isLarge={isVertical} />
         </div>
       </div>
 

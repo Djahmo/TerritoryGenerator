@@ -7,6 +7,7 @@ import ErrorBoundary from '@/components/ux/navigation/ErrorBoundary'
 import Territory from '@/pages/Territory'
 import Configuration from '@/pages/Configuration'
 import AllTerritory from '@/pages/AllTerritory'
+import Exportation from '@/pages/Exportation'
 
 const router = createBrowserRouter([
   {
@@ -16,7 +17,8 @@ const router = createBrowserRouter([
       { index: true, element: <AllTerritory /> },
       { path: 'territory/:num', element: <Territory /> },
       { path: 'configuration', element: <Configuration /> },
-      { path: 'all', element: <Territories /> },
+      { path: 'territories', element: <Territories /> },
+      { path: 'exportation', element: <Exportation /> },
       { path: '*', element: <NotFound /> },
     ],
     errorElement: <ErrorBoundary />,

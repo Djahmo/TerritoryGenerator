@@ -6,9 +6,10 @@ import { loadDefaultThumbnail } from "../services/thumbnailService"
 
 export const useGenerate = () => {  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 })
   const defaultImageRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { config, finalWidth, finalHeight, rawSize, largeFinalWidth, largeFinalHeight, largeRawSize, PHI } = useConfig()  // Mémorisation du service pour éviter les recréations
+  const { config, finalWidth, finalHeight, rawSize, largeFinalWidth, largeFinalHeight, largeRawSize, PHI } = useConfig()// Mémorisation du service pour éviter les recréations
   const imageService = useMemo(() =>
     new TerritoryImageService(
       config,
@@ -73,6 +74,7 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
 
     setLoading(true)
     setError(null)
+    setProgress({ current: 0, total: territories.length })
 
     // Créer un nouveau AbortController pour cette génération
     abortControllerRef.current = new AbortController()
@@ -117,11 +119,12 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
               }
 
               completedCount++
+              setProgress({ current: completedCount, total: territories.length })
 
-              callback([...initialTerritories])
-            } catch (error) {
+              callback([...initialTerritories])            } catch (error) {
               console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
               completedCount++
+              setProgress({ current: completedCount, total: territories.length })
             } finally {
               resolve()
             }
@@ -137,9 +140,9 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
 
       await Promise.all(promises)
     } catch (error) {
-      setError(`Erreur lors de la génération: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
-    } finally {
+      setError(`Erreur lors de la génération: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)    } finally {
       setLoading(false)
+      setProgress({ current: 0, total: 0 })
     }
   }, [imageService])  // Fonction pour générer une image large et la sauvegarder
 
@@ -168,23 +171,29 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
     } catch (error) {
       throw new Error(`Erreur lors de la génération de l'image standard: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
-  }, [imageService])
-
-  // Fonction pour générer une image large avec un bbox personnalisé (pour le cropping)
+  }, [imageService])  // Fonction pour générer une image large avec un bbox personnalisé (pour le cropping)
   const generateLargeImageWithCrop = useCallback(async (
     territory: Territory,
-    customBbox: [number, number, number, number]
+    customBbox: [number, number, number, number],
+    cropData?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      imageWidth: number;
+      imageHeight: number;
+    }
   ): Promise<string> => {
     try {
-      return await imageService.generateLargeImageWithCustomBbox(territory, customBbox)
+      return await imageService.generateLargeImageWithCustomBbox(territory, customBbox, {}, cropData)
     } catch (error) {
       throw new Error(`Erreur lors de la génération de l'image croppée: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     }
   }, [imageService])
-
   return {
     loading,
     error,
+    progress,
     generateImages,
     generateLargeImage,
     generateLargeImageWithCrop,

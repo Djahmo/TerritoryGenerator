@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { Home, Settings, Map } from 'lucide-react'
+import { Home, Settings, Map, Download } from 'lucide-react'
 import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import LanguageSelector from '../LanguageSelector'
@@ -9,14 +9,15 @@ import { useTerritoryCache } from '../../../hooks/useTerritoryCache'
 const SideNav: FC = () => {
   const { t } = useTranslation()
   const { cache } = useTerritoryCache()
-  
+
   // Vérifier s'il y a des territoires en cache
   const hasTerritoriesInCache = cache?.territories && cache.territories.length > 0
-
   const links = [
     { label: t('c.ux.nav.home'), icon: Home, href: '/' },
     // Conditionellement inclure le lien vers les territoires
-    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.allTerritories', 'Mes territoires'), icon: Map, href: '/all' }] : []),
+    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.allTerritories', 'Mes territoires'), icon: Map, href: '/territories' }] : []),
+    // Conditionellement inclure le lien vers l'exportation
+    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.exportation', 'Exportation'), icon: Download, href: '/exportation' }] : []),
     { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' }
   ]
 

@@ -9,7 +9,8 @@
     "apps/backend"
   ],
   "scripts": {
-    "dev": "npm --workspace=frontend run dev"
+    "dev": "npm --workspace=frontend run dev",
+    "build": "npm --workspace=frontend run build"
   },
   "keywords": [],
   "author": "",

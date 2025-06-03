@@ -26,22 +26,32 @@ const Cropper: React.FC<CropperProps> = ({ src, open, onClose, onApply, isLoadin
     x: 25,
     y: 25,
   });
-
   const [displaySrc, setDisplaySrc] = useState(src);
   const [aspect, setAspect] = useState(1);
+  const [originalAspect, setOriginalAspect] = useState(1);
+  const [isAspectFlipped, setIsAspectFlipped] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
+
   useEffect(() => {
     if (!src) return;
     const img = new Image();
     img.onload = () => {
       const aspectRatio = img.width / img.height;
+      setOriginalAspect(aspectRatio);
       setAspect(aspectRatio);
+      setIsAspectFlipped(false);
       setImageDimensions({ width: img.width, height: img.height });
     };
     img.src = src;
     setDisplaySrc(src);
   }, [src]);
+
+  const handleFlipAspect = () => {
+    const newFlippedState = !isAspectFlipped;
+    setIsAspectFlipped(newFlippedState);
+    setAspect(newFlippedState ? 1 / originalAspect : originalAspect);
+  };
 
   const handleApplyCrop = () => {
     if (onApply && crop.width && crop.height && imgRef.current && imageDimensions.width && imageDimensions.height) {      const displayedWidth = imgRef.current.clientWidth;
@@ -74,7 +84,6 @@ const Cropper: React.FC<CropperProps> = ({ src, open, onClose, onApply, isLoadin
             </svg>
           </button>
         </div>
-
         <div className="mb-6 flex justify-center">
           <ReactCrop
             crop={crop}
@@ -89,6 +98,40 @@ const Cropper: React.FC<CropperProps> = ({ src, open, onClose, onApply, isLoadin
               className="max-w-full max-h-[60vh] object-contain"
             />
           </ReactCrop>
+        </div>
+
+        <div className="mb-4 flex justify-center">
+          <button
+            onClick={handleFlipAspect}
+            className="btn-neutral flex items-center gap-2"
+            disabled={isLoading}
+            title={isAspectFlipped ? "Revenir au ratio original" : "Inverser le ratio d'aspect"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M15 2H9v4h6V2z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="m10 15 2-2 2 2"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {isAspectFlipped ? "Revenir au ratio original" : "Inverser le ratio"}
+          </button>
         </div>
 
         <div className="flex justify-end gap-3">

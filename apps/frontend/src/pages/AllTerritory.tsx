@@ -58,7 +58,7 @@ const TerritoryOverlay: React.FC<{
 const AllTerritory: React.FC = () => {
   const { cache, loading, updateGpx, updateTerritories } = useTerritoryCache()
   const { content, type, error: fileError, readFile } = useFileReader()
-  const { loading: imgLoading, error: imgError, generateImages } = useGenerate()
+  const { loading: imgLoading, error: imgError, progress, generateImages } = useGenerate()
   const { t } = useTranslation()
   const [territoriesGeoJSON, setTerritoriesGeoJSON] = useState<TerritoryGeoJSON[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -206,10 +206,24 @@ const AllTerritory: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {imgLoading ? "Génération des territoires..." : "Chargement des territoires..."}
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-positive mx-auto mb-4"></div>
+          <p className="text-muted">
+            {imgLoading ? (
+              progress.total > 0 ?
+                `Génération des territoires... ${progress.current}/${progress.total}` :
+                "Génération des territoires..."
+            ) : "Chargement des territoires..."}
           </p>
+          {imgLoading && progress.total > 0 && (
+            <div className="mt-4 w-64 mx-auto">
+              <div className="bg-muted/20 rounded-full h-2">
+                <div
+                  className="bg-positive h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -254,15 +268,9 @@ const AllTerritory: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-light">
               {t("home.upload_title", "Charger un fichier territoire")}
             </h1>
-            <Link
-              to="/"
-              className="btn-neutral"
-            >
-              ← Retour à l'accueil
-            </Link>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-center h-[calc(100vh-73px)]">
           <div className="text-center max-w-md">
             <h2 className="text-xl font-semibold mb-4 text-dark dark:text-light">
@@ -271,9 +279,9 @@ const AllTerritory: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Il n'y a pas encore de territoires avec des données GPX. Téléversez un fichier CSV ou GPX pour commencer.
             </p>
-            <FileUpload 
-              onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')} 
-              loading={imgLoading} 
+            <FileUpload
+              onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')}
+              loading={imgLoading}
             />
           </div>
         </div>
@@ -293,12 +301,6 @@ const AllTerritory: React.FC = () => {
             >
               📤 Re téléverser mes territoires
             </button>
-            <Link
-              to="/"
-              className="btn-neutral"
-            >
-              ← Retour à l'accueil
-            </Link>
           </div>
         </div>
       </div><div className="h-[calc(100vh-73px)] relative">
@@ -352,12 +354,12 @@ const AllTerritory: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Téléversez un nouveau fichier CSV ou GPX pour remplacer vos territoires actuels.
             </p>
-            <FileUpload 
+            <FileUpload
               onFile={file => {
                 readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')
                 setShowUpload(false)
-              }} 
-              loading={imgLoading} 
+              }}
+              loading={imgLoading}
             />
           </div>
         </div>
