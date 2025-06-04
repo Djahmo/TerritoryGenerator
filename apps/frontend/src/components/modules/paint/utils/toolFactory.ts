@@ -1,6 +1,6 @@
 // Utilitaire pour créer des outils avec des patterns communs
 import { Point, ToolType, DrawObject } from './types';
-import { BrushTool, LineTool, RectangleTool, CircleTool, ArrowTool, SelectionTool, TextTool, ParkingTool } from '../tools';
+import { BrushTool, LineTool, RectangleTool, CircleTool, ArrowTool, SelectionTool, TextTool, ParkingTool, CompassTool } from '../tools';
 
 /**
  * Interface de base pour les outils qui utilisent des coordonnées start/end
@@ -188,6 +188,8 @@ export const createToolShape = (
       return TextTool.createNew(color, fontSize, point);
     case 'parking':
       return ParkingTool.createNew(color, point);
+    case 'compass':
+      return CompassTool.createNew(color, point);
     case 'selection':
       return SelectionTool.createNew(point);
     case 'brush':
@@ -246,6 +248,11 @@ export const updateToolShape = (
         return SelectionTool.updateEnd(currentShape, point);
       }
       break;
+    case 'compass':
+      if (currentShape.type === 'compass') {
+        return CompassTool.updatePosition(currentShape, point);
+      }
+      break;
     default:
       return null;
   }
@@ -283,6 +290,9 @@ export const drawToolShape = (
       break;
     case 'parking':
       ParkingTool.draw(ctx, shape);
+      break;
+    case 'compass':
+      CompassTool.draw(ctx, shape);
       break;
   }
 };

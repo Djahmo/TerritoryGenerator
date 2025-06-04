@@ -42,6 +42,11 @@ export type ParkingLayerData = {
   position: Point
 }
 
+export type CompassLayerData = {
+  position: Point
+  rotation?: number
+}
+
 export type LayerData =
   | { type: 'brush'; data: BrushLayerData }
   | { type: 'line'; data: LineLayerData }
@@ -50,6 +55,7 @@ export type LayerData =
   | { type: 'rectangle'; data: RectangleLayerData }
   | { type: 'text'; data: TextLayerData }
   | { type: 'parking'; data: ParkingLayerData }
+  | { type: 'compass'; data: CompassLayerData }
 
 export type PaintLayer = {
   id: string
@@ -71,6 +77,9 @@ export type Territory = {
 
   // Bbox actuel pour l'image large (pour les opérations de crop)
   currentBboxLarge?: [number, number, number, number]
+  
+  // Angle de rotation optimal du territoire
+  rotation?: number
 
   // Layers de dessin pour chaque format
   paintLayersImage?: PaintLayer[]

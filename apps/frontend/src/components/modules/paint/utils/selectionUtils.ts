@@ -45,12 +45,15 @@ export const isPointInObject = (point: Point, obj: DrawObject): boolean => {
       const dx = x - center.x;
       const dy = y - center.y;
       const normalizedDistance = (dx * dx) / (radiusX * radiusX) + (dy * dy) / (radiusY * radiusY);
-      return normalizedDistance <= 1;
-
-    case 'parking':
+      return normalizedDistance <= 1;    case 'parking':
       const parkingRadius = 15
       const parkingDistance = Math.hypot(x - obj.x, y - obj.y)
       return parkingDistance <= parkingRadius
+
+    case 'compass':
+      const compassRadius = 160 // La taille de la rose des vents est de 320, donc rayon = 160
+      const compassDistance = Math.hypot(x - obj.x, y - obj.y)
+      return compassDistance <= compassRadius
 
     case 'text':
       const textWidth = obj.content.length * obj.fontSize * 0.6
@@ -73,9 +76,10 @@ export const getObjectCenter = (obj: DrawObject): Point => {
     case 'arrow':
     case 'rectangle':
     case 'circle':
-      return getRectCenter(obj);
+      return getRectCenter(obj);    case 'parking':
+      return { x: obj.x, y: obj.y };
 
-    case 'parking':
+    case 'compass':
       return { x: obj.x, y: obj.y };
 
     case 'text':
@@ -129,9 +133,10 @@ export const getObjectBounds = (obj: DrawObject): { x: number; y: number; width:
         y: obj.y,
         width: maxLineLength * obj.fontSize * 0.6,
         height: lines.length * lineHeight
-      };
-    case 'parking':
+      };    case 'parking':
       return { x: obj.x - 15, y: obj.y - 15, width: 30, height: 30 };
+    case 'compass':
+      return { x: obj.x - 160, y: obj.y - 160, width: 320, height: 320 };
     default:
       return null;
   }

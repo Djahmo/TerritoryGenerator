@@ -1,4 +1,4 @@
-import { Brush, SquareParking, Spline, Type, Square, Circle, ArrowRight, Move } from "lucide-react"
+import { Brush, SquareParking, Compass, Spline, Type, Square, Circle, ArrowRight, Move } from "lucide-react"
 import type { Tool } from "./types"
 
 // Colors
@@ -19,5 +19,6 @@ export const TOOLS: Tool[] = [
   { name: 'rectangle', label: 'Rectangle', icon: Square },
   { name: 'circle', label: 'Cercle', icon: Circle },
   { name: 'text', label: 'Texte', icon: Type },
-  { name: 'parking', label: 'Parking', icon: SquareParking }
+  { name: 'parking', label: 'Parking', icon: SquareParking },
+  { name: 'compass', label: 'Rose des vents', icon: Compass }
 ] as const

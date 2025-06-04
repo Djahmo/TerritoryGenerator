@@ -18,10 +18,9 @@ export const moveObject = (obj: DrawObject, deltaX: number, deltaY: number): Dra
         startY: obj.startY + deltaY,
         endX: obj.endX + deltaX,
         endY: obj.endY + deltaY
-      };
-
-    case 'text':
+      };    case 'text':
     case 'parking':
+    case 'compass':
       return {
         ...obj,
         x: obj.x + deltaX,

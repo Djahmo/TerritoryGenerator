@@ -295,14 +295,16 @@ const Territory = () => {
               </div>
             </div>
           )}
-
           <Paint
             key={paintKey}
             src={isLarge ? (territory.originalLarge || territory.original || "") : (territory.original || "")}
             layers={isLarge ? (territory.paintLayersLarge || []) : (territory.paintLayersImage || [])}
             onSave={handleSave}
             onCrop={handleApplyCrop}
-            isLarge={isVertical} />
+            isLarge={isVertical}
+            territoryPolygon={territory?.polygon}
+            territory={territory}
+            />
         </div>
       </div>
 

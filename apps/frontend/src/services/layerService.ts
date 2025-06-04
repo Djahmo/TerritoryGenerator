@@ -78,9 +78,8 @@ export class LayerService {
           data: {
             startPoint: { x: drawObject.startX, y: drawObject.startY },
             endPoint: { x: drawObject.endX, y: drawObject.endY }
-          }
-        } as PaintLayer
-
+          }        } as PaintLayer
+        
       case 'text':
         return {
           ...baseLayer,
@@ -91,13 +90,33 @@ export class LayerService {
             fontSize: (drawObject as any).fontSize || 16
           }
         } as PaintLayer
-
+        
       case 'parking':
         return {
           ...baseLayer,
           type: 'parking',
           data: {
             position: { x: drawObject.x, y: drawObject.y }
+          }
+        } as PaintLayer
+        
+      case 'compass':
+        return {
+          ...baseLayer,
+          type: 'compass',
+          data: {
+            position: { x: drawObject.x, y: drawObject.y },
+            rotation: (drawObject as any).rotation || 0
+          }
+        } as PaintLayer
+
+      case 'compass':
+        return {
+          ...baseLayer,
+          type: 'compass',
+          data: {
+            position: { x: drawObject.x, y: drawObject.y },
+            rotation: (drawObject as any).rotation || 0
           }
         } as PaintLayer
 
@@ -164,8 +183,8 @@ export class LayerService {
           startY: layer.data.startPoint.y,
           endX: layer.data.endPoint.x,
           endY: layer.data.endPoint.y
-        } as DrawObject
-
+                } as DrawObject
+        
       case 'text':
         return {
           ...baseObject,
@@ -176,7 +195,7 @@ export class LayerService {
           content: layer.data.content,
           fontSize: (layer.data as any).fontSize || 16
         } as DrawObject
-
+        
       case 'parking':
         return {
           ...baseObject,
@@ -184,6 +203,16 @@ export class LayerService {
           id: `parking_${Date.now()}`,
           x: layer.data.position.x,
           y: layer.data.position.y
+        } as DrawObject
+
+      case 'compass':
+        return {
+          ...baseObject,
+          type: 'compass',
+          id: `compass_${Date.now()}`,
+          x: layer.data.position.x,
+          y: layer.data.position.y,
+          rotation: layer.data.rotation || 0
         } as DrawObject
 
       default:

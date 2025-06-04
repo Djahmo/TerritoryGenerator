@@ -40,6 +40,15 @@ export interface DrawParking {
   y: number;
 }
 
+export interface DrawCompass {
+  id: string;
+  type: 'compass';
+  color: string;
+  x: number;
+  y: number;
+  rotation?: number; // Rotation en radians pour orienter la rose des vents
+}
+
 export interface DrawText {
   id: string;
   type: 'text';
@@ -92,9 +101,9 @@ export interface DrawSelection {
   endY: number;
 }
 
-export type DrawObject = DrawBrush | DrawLine | DrawParking | DrawText | DrawRectangle | DrawCircle | DrawArrow | DrawSelection;
+export type DrawObject = DrawBrush | DrawLine | DrawParking | DrawCompass | DrawText | DrawRectangle | DrawCircle | DrawArrow | DrawSelection;
 
-export type ToolType = 'brush' | 'line' | 'parking' | 'text' | 'rectangle' | 'circle' | 'arrow' | 'selection';
+export type ToolType = 'brush' | 'line' | 'parking' | 'compass' | 'text' | 'rectangle' | 'circle' | 'arrow' | 'selection';
 
 export interface Tool {
   name: ToolType;

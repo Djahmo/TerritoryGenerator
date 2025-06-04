@@ -164,54 +164,14 @@ const AllTerritory: React.FC = () => {
       if (content && type) {
         const parsed = parse(content, type)
         setTerritories(parsed.sort((a, b) => a.num.localeCompare(b.num)))
-        
         if (parsed.length) {
-          // Nombre maximal de tentatives pour générer les images
-          const MAX_RETRY = 3
-          let currentRetry = 0
-          let currentTerritories = [...parsed]
-            // Fonction pour gérer la génération des images
-          const processImageGeneration = async (territoriesArray: Territory[]) => {
-            if (territoriesArray.length === 0 || currentRetry >= MAX_RETRY) return
-            
-            await generateImages(territoriesArray, (updatedTerritories) => {
-              // Mettre à jour l'état avec tous les territoires mis à jour
-              setTerritories(prev => {
-                // Fusionner les territoires mis à jour avec les précédents
-                const territoryMap = new Map(prev.map(t => [t.num, t]))
-                updatedTerritories.forEach(t => territoryMap.set(t.num, t))
-                return Array.from(territoryMap.values()).sort((a, b) => a.num.localeCompare(b.num))
-              })
-              
-              // Sauvegarder les territoires qui ont réussi
-              const successfulTerritories = updatedTerritories.filter(t => !t.isDefault && t.image)
-              
-              if (successfulTerritories.length > 0) {
-                // Récupérer tous les territoires pour la mise à jour du GPX
-                setTerritories(prev => {
-                  const allTerritories = [...prev]
-                  // Mettre à jour le GPX et sauvegarder les territoires
-                  updateGpx(makeGpx(allTerritories))
-                  updateTerritories(allTerritories)
-                  return allTerritories
-                })
-              }
-              
-              // Filtrer les territoires qui ont échoué pour la prochaine tentative
-              const failedTerritories = updatedTerritories.filter(t => t.isDefault || !t.image)
-              currentTerritories = failedTerritories
-              
-              // Si nous avons encore des territoires qui ont échoué, réessayer
-              if (failedTerritories.length > 0 && currentRetry < MAX_RETRY) {
-                currentRetry++
-                console.log(`Tentative ${currentRetry}/${MAX_RETRY} pour ${failedTerritories.length} territoires qui ont échoué`)
-                processImageGeneration(failedTerritories)
-              }
-            })
-          }
-          
-          // Démarrer le processus de génération
-          await processImageGeneration(currentTerritories)
+          await generateImages(parsed, (territorys) => {
+            setTerritories(territorys)
+            if (territorys.every(t => !t.isDefault && t.image)) {
+              updateGpx(makeGpx(parsed))
+              updateTerritories(territorys)
+            }
+          })
         }
       }
     })()

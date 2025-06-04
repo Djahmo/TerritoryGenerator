@@ -32,7 +32,8 @@ export const useGenerate = () => {  const [loading, setLoading] = useState(false
         ignApiFormat: config.ignApiFormat,
         ignApiCRS: config.ignApiCRS,
         networkRetries: config.networkRetries,
-        networkDelay: config.networkDelay,        ignApiRateLimit: config.ignApiRateLimit
+        networkDelay: config.networkDelay,
+        ignApiRateLimit: config.ignApiRateLimit
       }
     ),
     [config, finalWidth, finalHeight, rawSize, largeFinalWidth, largeFinalHeight, largeRawSize, PHI]

@@ -75,9 +75,7 @@ export class TerritoryImageService {  constructor(
     // 3. Conversion du polygone en pixels
     const polygonPixels = territory.polygon.map(coord =>
       gpsToPixel(coord.lat, coord.lon, bbox, this.dimensions.rawSize)
-    )
-
-    // 4. Calcul de l'orientation optimale
+    )    // 4. Calcul de l'orientation optimale
     const hull = convexHull(polygonPixels)
     const optimal = findOptimalOrientation(
       hull,
@@ -85,6 +83,9 @@ export class TerritoryImageService {  constructor(
       this.dimensions.finalWidth,
       this.dimensions.finalHeight
     )
+    
+    // Sauvegarder l'angle d'orientation dans l'objet territoire
+    territory.rotation = optimal.angle;
 
     // 5. Création du canvas de base avec rotation
     const baseCanvas = this.createRotatedCanvas(mapImage, optimal.angle)
@@ -252,8 +253,6 @@ export class TerritoryImageService {  constructor(
       // Crop plus haut que large (portrait)
       finalHeight = referenceDimension
       finalWidth = Math.round(referenceDimension * cropAspectRatio)    }
-
-    console.log('📐 Final dimensions:', finalWidth, 'x', finalHeight, 'ratio:', finalWidth / finalHeight);
 
     const finalCanvas = cropAndResize(
       canvas,
