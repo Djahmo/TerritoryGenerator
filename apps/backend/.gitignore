@@ -11,6 +11,8 @@ logs
 *.log
 *.tsbuildinfo
 
+public
+
 # Env
 env.json
 .env

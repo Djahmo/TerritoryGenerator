@@ -1,26 +1,28 @@
-import type { Territory } from "%/types"
+import { createCanvas, loadImage, Canvas, Image } from 'canvas'
+import type { Territory, GeneratedImage, ImageGenerationConfig } from '../types/territory.js'
 import {
   calculateBoundingBox,
   convexHull,
   gpsToPixel,
   findOptimalOrientation,
   rotatePoint
-} from '../utils/geometry'
+} from '../utils/geometry.js'
 import {
   drawMask,
   drawContour,
   rotateCanvas,
   cropAndResize,
-  flipCanvasIfNeeded
-} from '../utils/canvas'
-import { loadImageBitmap, buildIgnUrl } from './networkService'
-import { createThumbnail } from './thumbnailService'
-import { type GeneratedImage, type ImageGenerationConfig } from '../utils/types'
+  flipCanvasIfNeeded,
+  setCanvasQuality
+} from '../utils/canvas.js'
+import { loadImageBuffer, buildIgnUrl } from '../utils/network.js'
+import { createThumbnail, createThumbnailFromDataUrl } from './thumbnailService.js'
 
 /**
- * Service principal pour la génération d'images de territoires
+ * Service principal pour la génération d'images de territoires côté backend
  */
-export class TerritoryImageService {  constructor(
+export class TerritoryImageService {
+  constructor(
     private config: { ppp: number, largeFactor: number },
     private dimensions: {
       finalWidth: number
@@ -48,7 +50,8 @@ export class TerritoryImageService {  constructor(
 
   /**
    * Génère une image normale (avec optimisation d'orientation)
-   */  async generateStandardImage(
+   */
+  async generateStandardImage(
     territory: Territory,
     options: ImageGenerationConfig = {}
   ): Promise<GeneratedImage> {
@@ -59,23 +62,29 @@ export class TerritoryImageService {  constructor(
     }
 
     // 1. Calcul de la bounding box
-    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)    // 2. Chargement de l'image de la carte
+    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)
+
+    // 2. Chargement de l'image de la carte
     const url = buildIgnUrl(bbox, this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
       layer: this.userConfig.ignApiLayer,
       format: this.userConfig.ignApiFormat,
       crs: this.userConfig.ignApiCRS
     })
-    const mapImage = await loadImageBitmap(
+
+    const imageBuffer = await loadImageBuffer(
       url,
       this.userConfig.networkRetries,
       this.userConfig.networkDelay
     )
+    const mapImage = await loadImage(imageBuffer)
 
     // 3. Conversion du polygone en pixels
     const polygonPixels = territory.polygon.map(coord =>
       gpsToPixel(coord.lat, coord.lon, bbox, this.dimensions.rawSize)
-    )    // 4. Calcul de l'orientation optimale
+    )
+
+    // 4. Calcul de l'orientation optimale
     const hull = convexHull(polygonPixels)
     const optimal = findOptimalOrientation(
       hull,
@@ -83,9 +92,9 @@ export class TerritoryImageService {  constructor(
       this.dimensions.finalWidth,
       this.dimensions.finalHeight
     )
-    
+
     // Sauvegarder l'angle d'orientation dans l'objet territoire
-    territory.rotation = optimal.angle;
+    territory.rotation = optimal.angle
 
     // 5. Création du canvas de base avec rotation
     const baseCanvas = this.createRotatedCanvas(mapImage, optimal.angle)
@@ -109,49 +118,57 @@ export class TerritoryImageService {  constructor(
     )
 
     // 9. Ajout du masque et du contour
-    const ctx = croppedCanvas.getContext('2d')!
+    const ctx = croppedCanvas.getContext('2d')
     drawMask(ctx, finalPolygon, this.dimensions.finalWidth, this.dimensions.finalHeight, {
       planLarge: false
     })
-    drawContour(ctx, finalPolygon, { color: contourColor, lineWidth: contourWidth })    // 10. Correction de l'orientation si nécessaire
-    const finalCanvas = flipCanvasIfNeeded(croppedCanvas, optimal.angle)    // 11. Génération de l'image et de la miniature
-    const image = finalCanvas.toDataURL('image/png')
+    drawContour(ctx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
+
+    // 10. Correction de l'orientation si nécessaire
+    const finalCanvas = flipCanvasIfNeeded(croppedCanvas, optimal.angle)
+
+    // 11. Génération de l'image et de la miniature
+    const image = finalCanvas.toDataURL()
     const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * this.userConfig.thumbnailWidth)
-    const miniature = await createThumbnail(image, this.userConfig.thumbnailWidth, minHeight)
+    const miniature = await createThumbnailFromDataUrl(image, this.userConfig.thumbnailWidth, minHeight)
 
     return { image, miniature }
   }
 
   /**
    * Génère une image large (sans optimisation d'orientation)
-   */  async generateLargeImage(
+   */
+  async generateLargeImage(
     territory: Territory,
     options: ImageGenerationConfig = {}
-  ): Promise<string> {
+  ): Promise<{ dataUrl: string, width: number, height: number }> {
     const { contourColor, contourWidth } = {
       contourColor: this.userConfig.contourColor,
       contourWidth: this.userConfig.contourWidth,
       ...options
-    }    // 1. Calcul de la bounding box pour plan large
-    const bbox = calculateBoundingBox(territory.polygon, true, this.config, this.PHI)    // 2. Chargement de l'image
+    }
+
+    // 1. Calcul de la bounding box pour plan large
+    const bbox = calculateBoundingBox(territory.polygon, true, this.config, this.PHI)
+
+    // 2. Chargement de l'image
     const url = buildIgnUrl(bbox, this.dimensions.largeRawSize || this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
       layer: this.userConfig.ignApiLayer,
       format: this.userConfig.ignApiFormat,
       crs: this.userConfig.ignApiCRS
     })
-    const mapImage = await loadImageBitmap(
+
+    const imageBuffer = await loadImageBuffer(
       url,
       this.userConfig.networkRetries,
       this.userConfig.networkDelay
     )
+    const mapImage = await loadImage(imageBuffer)
 
     // 3. Création du canvas de base
-    const canvas = document.createElement('canvas')
-    const canvasSize = this.dimensions.largeRawSize || this.dimensions.rawSize
-    canvas.width = canvasSize
-    canvas.height = canvasSize
-    const ctx = canvas.getContext('2d')!
+    const canvas = createCanvas(this.dimensions.largeRawSize || this.dimensions.rawSize, this.dimensions.largeRawSize || this.dimensions.rawSize)
+    const ctx = canvas.getContext('2d')
     ctx.drawImage(mapImage, 0, 0)
 
     // 4. Redimensionnement direct
@@ -159,29 +176,36 @@ export class TerritoryImageService {  constructor(
     const finalHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight
     const finalCanvas = cropAndResize(
       canvas,
-      { x: 0, y: 0, width: canvasSize, height: canvasSize },
+      { x: 0, y: 0, width: canvas.width, height: canvas.height },
       finalWidth,
       finalHeight
-    )    // 5. Transformation du polygone
+    )
+
+    // 5. Transformation du polygone
     const polygonPixels = territory.polygon.map(coord =>
-      gpsToPixel(coord.lat, coord.lon, bbox, canvasSize)
+      gpsToPixel(coord.lat, coord.lon, bbox, canvas.width)
     )
 
     const finalPolygon = polygonPixels.map(([x, y]) => {
-      const xf = (x * finalWidth) / canvasSize
-      const yf = (y * finalHeight) / canvasSize
+      const xf = (x * finalWidth) / canvas.width
+      const yf = (y * finalHeight) / canvas.height
       return [xf, yf] as [number, number]
     })
 
     // 6. Ajout du masque et du contour
-    const finalCtx = finalCanvas.getContext('2d')!
+    const finalCtx = finalCanvas.getContext('2d')
     drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
       planLarge: true
     })
     drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
 
-    return finalCanvas.toDataURL('image/png')
-  }  /**
+    return {
+      dataUrl: finalCanvas.toDataURL(),
+      width: finalWidth,
+      height: finalHeight
+    }
+  }
+  /**
    * Génère une image large avec un bbox personnalisé (utilisé après cropping)
    */
   async generateLargeImageWithCustomBbox(
@@ -196,13 +220,18 @@ export class TerritoryImageService {  constructor(
       imageWidth: number;
       imageHeight: number;
     }
-  ): Promise<string> {
+  ): Promise<{ dataUrl: string, width: number, height: number }> {
     const { contourColor, contourWidth } = {
       contourColor: this.userConfig.contourColor,
       contourWidth: this.userConfig.contourWidth,
       ...options
-    }    // 1. Utiliser le bbox personnalisé au lieu de calculer
-    const bbox = customBbox    // 2. Calculer le ratio d'aspect du crop
+    }
+
+    // 1. Utiliser le bbox personnalisé au lieu de calculer
+    const bbox = customBbox
+    console.log('GENERATE IMAGE: Bbox personnalisé:', bbox);
+
+    // 2. Calculer le ratio d'aspect du crop
     let cropAspectRatio: number;
 
     if (cropData) {
@@ -210,14 +239,14 @@ export class TerritoryImageService {  constructor(
       const cropWidthPixels = cropData.width * cropData.imageWidth;
       const cropHeightPixels = cropData.height * cropData.imageHeight;
       cropAspectRatio = cropWidthPixels / cropHeightPixels;
-      console.log('🎯 Using real image crop aspect ratio:', cropAspectRatio, 'from crop pixels:', cropWidthPixels, 'x', cropHeightPixels);
+      console.log('GENERATE IMAGE: Crop data:', cropData, 'Ratio:', cropAspectRatio);
     } else {
       // Fallback sur le ratio géographique
       const [minLon, minLat, maxLon, maxLat] = bbox
       const bboxWidth = maxLon - minLon
       const bboxHeight = maxLat - minLat
       cropAspectRatio = bboxWidth / bboxHeight
-      console.log('🎯 Using geographic aspect ratio:', cropAspectRatio, 'bbox dimensions:', bboxWidth, 'x', bboxHeight)
+      console.log('GENERATE IMAGE: Ratio géographique:', cropAspectRatio, 'Dimensions:', { bboxWidth, bboxHeight });
     }
 
     // 3. Chargement de l'image
@@ -227,76 +256,87 @@ export class TerritoryImageService {  constructor(
       format: this.userConfig.ignApiFormat,
       crs: this.userConfig.ignApiCRS
     })
-    const mapImage = await loadImageBitmap(
-      url,
-      this.userConfig.networkRetries,
-      this.userConfig.networkDelay
-    )
+    
+    console.log('GENERATE IMAGE: URL générée:', url.substring(0, 200) + '...');
 
-    // 4. Création du canvas de base
-    const canvas = document.createElement('canvas')
-    const canvasSize = this.dimensions.largeRawSize || this.dimensions.rawSize
-    canvas.width = canvasSize
-    canvas.height = canvasSize
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(mapImage, 0, 0)    // 5. Calcul des dimensions finales basées sur le ratio du crop
-    // Utiliser une dimension de référence qui s'adapte au crop plutôt qu'à la configuration
-    const referenceDimension = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
-    let finalWidth: number
-    let finalHeight: number
-      // Calculer les dimensions pour maintenir le ratio du crop tout en gardant une taille raisonnable
-    if (cropAspectRatio >= 1) {
-      // Crop plus large que haut (paysage)
-      finalWidth = referenceDimension
-      finalHeight = Math.round(referenceDimension / cropAspectRatio)
-    } else {
-      // Crop plus haut que large (portrait)
-      finalHeight = referenceDimension
-      finalWidth = Math.round(referenceDimension * cropAspectRatio)    }
+    try {
+      const imageBuffer = await loadImageBuffer(
+        url,
+        this.userConfig.networkRetries,
+        this.userConfig.networkDelay
+      )
+      console.log('GENERATE IMAGE: Image chargée avec succès');
+      const mapImage = await loadImage(imageBuffer)
 
-    const finalCanvas = cropAndResize(
-      canvas,
-      { x: 0, y: 0, width: canvasSize, height: canvasSize },
-      finalWidth,
-      finalHeight
-    )
+      // 4. Création du canvas de base
+      const canvas = createCanvas(this.dimensions.largeRawSize || this.dimensions.rawSize, this.dimensions.largeRawSize || this.dimensions.rawSize)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(mapImage, 0, 0)
 
-    // 6. Transformation du polygone
-    const polygonPixels = territory.polygon.map(coord =>
-      gpsToPixel(coord.lat, coord.lon, bbox, canvasSize)
-    )
+      // 5. Calcul des dimensions finales basées sur le ratio du crop
+      const referenceDimension = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
+      let finalWidth: number
+      let finalHeight: number
 
-    const finalPolygon = polygonPixels.map(([x, y]) => {
-      const xf = (x * finalWidth) / canvasSize
-      const yf = (y * finalHeight) / canvasSize
-      return [xf, yf] as [number, number]
-    })
+      if (cropAspectRatio >= 1) {
+        // Crop plus large que haut (paysage)
+        finalWidth = referenceDimension
+        finalHeight = Math.round(referenceDimension / cropAspectRatio)
+      } else {
+        // Crop plus haut que large (portrait)
+        finalHeight = referenceDimension
+        finalWidth = Math.round(referenceDimension * cropAspectRatio)
+      }
 
-    // 7. Ajout du masque et du contour
-    const finalCtx = finalCanvas.getContext('2d')!
-    drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
-      planLarge: true
-    })
-    drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
+      const finalCanvas = cropAndResize(
+        canvas,
+        { x: 0, y: 0, width: canvas.width, height: canvas.height },
+        finalWidth,
+        finalHeight
+      )
 
-    return finalCanvas.toDataURL('image/png')
+      // 6. Transformation du polygone
+      const polygonPixels = territory.polygon.map(coord =>
+        gpsToPixel(coord.lat, coord.lon, bbox, canvas.width)
+      )
+
+      const finalPolygon = polygonPixels.map(([x, y]) => {
+        const xf = (x * finalWidth) / canvas.width
+        const yf = (y * finalHeight) / canvas.height
+        return [xf, yf] as [number, number]
+      })
+
+      // 7. Ajout du masque et du contour
+      const finalCtx = finalCanvas.getContext('2d')
+      drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
+        planLarge: true
+      })
+      drawContour(finalCtx, finalPolygon, { color: contourColor, lineWidth: contourWidth })
+
+      return {
+        dataUrl: finalCanvas.toDataURL(),
+        width: finalWidth,
+        height: finalHeight
+      }
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'image avec bbox personnalisé:', error)
+      throw error
+    }
   }
 
   /**
    * Génère une miniature à partir d'une image existante
-   */  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
+   */
+  async generateThumbnailFromImage(imageDataUrl: string): Promise<string> {
     const minHeight = Math.round(this.dimensions.finalHeight / this.dimensions.finalWidth * this.userConfig.thumbnailWidth)
-    return await createThumbnail(imageDataUrl, this.userConfig.thumbnailWidth, minHeight)
+    return await createThumbnailFromDataUrl(imageDataUrl, this.userConfig.thumbnailWidth, minHeight)
   }
-
   /**
    * Crée un canvas avec l'image rotée
    */
-  private createRotatedCanvas(image: ImageBitmap, angle: number): HTMLCanvasElement {
-    const canvas = document.createElement('canvas')
-    canvas.width = this.dimensions.rawSize
-    canvas.height = this.dimensions.rawSize
-    const ctx = canvas.getContext('2d')!
+  private createRotatedCanvas(image: Image, angle: number): Canvas {
+    const canvas = createCanvas(this.dimensions.rawSize, this.dimensions.rawSize)
+    const ctx = canvas.getContext('2d')
 
     rotateCanvas(ctx, image, angle, this.dimensions.rawSize / 2, this.dimensions.rawSize / 2)
 

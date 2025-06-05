@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { useTerritoryCache } from '../hooks/useTerritoryCache'
+import { useApiTerritory } from '&/useApiTerritory'
+import type { Territory } from '%/types'
 import JSZip from 'jszip'
 import { Download, FileArchive, Printer, Eye, Search } from 'lucide-react'
 import Wrapper from '@/components/ui/Wrapper'
@@ -9,7 +10,7 @@ import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 
 // Template de base pour le territoire (HTML sans container)
-const createTerritoryHTML = (territory: any): string => {
+const createTerritoryHTML = (territory: Territory): string => {
   return /*html*/`
     <div class="print-header">
       <div class="print-field date-field">
@@ -204,7 +205,7 @@ const createPrintHTML = (content: string, title: string = "Territoire", isMultiP
 }
 
 // Modal de prévisualisation d'impression
-const PrintPreviewModal: React.FC<{ territory: any; onClose: () => void; }> = ({ territory, onClose }) => {
+const PrintPreviewModal: React.FC<{ territory: Territory; onClose: () => void; }> = ({ territory, onClose }) => {
   const [isLandscape, setIsLandscape] = useState(false)
   const [activeTab, setActiveTab] = useState<'normal' | 'large'>('normal')
   const [isLandscapeLarge, setIsLandscapeLarge] = useState(false)
@@ -326,7 +327,7 @@ const PrintPreviewModal: React.FC<{ territory: any; onClose: () => void; }> = ({
 
 const Exportation: React.FC = () => {
   const { t } = useTranslation()
-  const { cache } = useTerritoryCache()
+  const { cache } = useApiTerritory()
   const navigate = useNavigate()
   const [isDownloading, setIsDownloading] = useState(false)
   const [previewTerritory, setPreviewTerritory] = useState<any>(null)
@@ -341,17 +342,16 @@ const Exportation: React.FC = () => {
       navigate('/')
     }
   }, [territories.length, navigate])
-
   // Filtrer les territoires selon la recherche
-  const filteredTerritories = territories.filter(territory =>
+  const filteredTerritories = territories.filter((territory: Territory) =>
     !search || `${territory.num} - ${territory.name}`.toLowerCase().includes(search.toLowerCase())
-  )  // Fonction pour créer un document HTML d'impression pour un territoire
-  const createPrintDocument = (territory: any, isLandscape?: boolean): string => {
+  )// Fonction pour créer un document HTML d'impression pour un territoire
+  const createPrintDocument = (territory: Territory, isLandscape?: boolean): string => {
     const territoryHTML = createTerritoryHTML(territory)
     const orientations = isLandscape !== undefined ? [isLandscape] : undefined
     return createPrintHTML(`<div class="print-container">${territoryHTML}</div>`, `Territoire ${territory.num}`, false, orientations)
   }  // Fonction pour imprimer un territoire individuel
-  const printTerritory = (territory: any) => {
+  const printTerritory = (territory: Territory) => {
     // D'abord analyser l'orientation de l'image
     const tempImg = new Image()
     tempImg.onload = () => {
@@ -412,7 +412,7 @@ const Exportation: React.FC = () => {
 
     tempImg.src = territory.image!
   }// Fonction pour imprimer la version large d'un territoire
-  const printTerritoryLarge = (territory: any) => {
+  const printTerritoryLarge = (territory: Territory) => {
     if (!territory.large) {
       alert("Aucune version large disponible pour ce territoire")
       return
@@ -484,11 +484,10 @@ const Exportation: React.FC = () => {
   const printAllTerritories = async () => {
     setIsPrintingAll(true)
 
-    try {
-      // Étape 1: Analyser l'orientation de chaque territoire
+    try {      // Étape 1: Analyser l'orientation de chaque territoire
       const territoriesWithOrientation = await Promise.all(
-        territories.map(async (territory) => {
-          return new Promise<{ territory: any, isLandscape: boolean }>((resolve) => {
+        territories.map(async (territory: Territory) => {
+          return new Promise<{ territory: Territory, isLandscape: boolean }>((resolve) => {
             const tempImg = new Image()
             tempImg.onload = () => {
               const isLandscape = tempImg.naturalWidth > tempImg.naturalHeight
@@ -501,20 +500,14 @@ const Exportation: React.FC = () => {
             tempImg.src = territory.image!
           })
         })
-      )
-
-      // Étape 2: Créer le contenu des territoires (le CSS gère automatiquement les sauts de page)
-      const territoriesContent = territoriesWithOrientation.map(({ territory }) => {
-        return `<div class="territory-page">
+      )      // Étape 2: Créer le contenu des territoires (le CSS gère automatiquement les sauts de page)
+      const territoriesContent = territoriesWithOrientation.map(({ territory }: { territory: Territory, isLandscape: boolean }) => {
+        return /*html*/`<div class="territory-page">
           <div class="print-container">${createTerritoryHTML(territory)}</div>
         </div>`
       }).join('')
 
-      // DÉBOGAGE : Afficher le nombre de territoires
-      console.log(`Génération de ${territoriesWithOrientation.length} territoires`)
-
-      // Étape 3: Créer le document HTML complet avec createPrintHTML
-      const orientations = territoriesWithOrientation.map(({ isLandscape }) => isLandscape)
+      const orientations = territoriesWithOrientation.map(({ isLandscape }: { territory: Territory, isLandscape: boolean }) => isLandscape)
       const allTerritoriesHtml = createPrintHTML(territoriesContent, 'Tous les territoires', true, orientations)
       // Étape 3: Ouvrir le document dans une nouvelle fenêtre
       const printWindow = window.open('', '_blank')
@@ -624,11 +617,10 @@ const Exportation: React.FC = () => {
         const orientations = [isLandscape]
         const htmlContent = createPrintHTML(`<div class="print-container">${territoryHTML}</div>`, `Territoire ${territory.num}`, false, orientations)
         printFolder?.file(`territoire_${territory.num}.html`, htmlContent)
-      }// Créer un fichier HTML avec tous les territoires en utilisant le nouveau système de templates
-      // Analyser les orientations pour le fichier multi-territoires
+      }// Créer un fichier HTML avec tous les territoires en utilisant le nouveau système de templates      // Analyser les orientations pour le fichier multi-territoires
       const territoriesWithOrientation = await Promise.all(
-        territories.map(async (territory) => {
-          return new Promise<{ territory: any, isLandscape: boolean }>((resolve) => {
+        territories.map(async (territory: Territory) => {
+          return new Promise<{ territory: Territory, isLandscape: boolean }>((resolve) => {
             const tempImg = new Image()
             tempImg.onload = () => {
               const isLandscape = tempImg.naturalWidth > tempImg.naturalHeight
@@ -639,17 +631,16 @@ const Exportation: React.FC = () => {
               resolve({ territory, isLandscape: false })
             }
             tempImg.src = territory.image!
-          })
-        })
+          })        })
       )
 
-      const territoriesContent = territoriesWithOrientation.map(({ territory }) => {
+      const territoriesContent = territoriesWithOrientation.map(({ territory }: { territory: Territory, isLandscape: boolean }) => {
         return `<div class="territory-page">
           <div class="print-container">${createTerritoryHTML(territory)}</div>
         </div>`
       }).join('')
 
-      const orientations = territoriesWithOrientation.map(({ isLandscape }) => isLandscape)
+      const orientations = territoriesWithOrientation.map(({ isLandscape }: { territory: Territory, isLandscape: boolean }) => isLandscape)
       const allTerritoriesHtml = createPrintHTML(territoriesContent, 'Tous les territoires', true, orientations)
 
       printFolder?.file('tous_les_territoires.html', allTerritoriesHtml)// Ajouter un fichier README avec les instructions
@@ -782,7 +773,7 @@ Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleT
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-4">Aucun territoire trouvé</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted mb-4">
             Il n'y a pas encore de territoires à exporter.
           </p>
           <Link
@@ -900,8 +891,7 @@ Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleT
                       className='w-full'
                     />
                   </div>
-                )}
-                {filteredTerritories.map((territory) => (
+                )}                {filteredTerritories.map((territory: Territory) => (
                   <div key={territory.num} className="bg-lightnd dark:bg-darknd rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">

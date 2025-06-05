@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router'
 import ThemeSelector from '#/ux/ThemeSelector'
 import LanguageSelector from '#/ux/LanguageSelector'
-import { useTerritoryCache } from '&/useTerritoryCache'
+import { useApiTerritory } from '&/useApiTerritory'
 
 const BottomNav = () => {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const location = useLocation()
-  const { cache } = useTerritoryCache()
+  const { cache } = useApiTerritory()
 
   const hasTerritoriesInCache = cache?.territories && cache.territories.length > 0
   const links = [

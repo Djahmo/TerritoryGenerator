@@ -3,14 +3,18 @@ import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import { DOMParser } from '@xmldom/xmldom'
 import * as toGeoJSON from '@tmcw/togeojson'
 import { Link } from 'react-router'
-import { useTerritoryCache } from '../hooks/useTerritoryCache'
+import { useApiTerritory } from '&/useApiTerritory'
 import type { Territory } from '../utils/types'
 import 'leaflet/dist/leaflet.css'
-import { useConfig } from '@/hooks/useConfig'
-import { useFileReader, parse, makeGpx } from '../hooks/useFile'
-import { useGenerate } from '../hooks/useGenerate'
+import { useApiConfig } from '@/hooks/useApiConfig'
+import { useFileReader, parse, makeGpx } from '&/useFile'
+import { useApiGenerate } from '&/useApiGenerate'
 import FileUpload from '../components/ui/FileUpload'
 import { useTranslation } from 'react-i18next'
+import { ApiTerritoryService } from '../services/apiTerritoryService'
+
+// Créer une instance du service API
+const apiService = new ApiTerritoryService()
 
 interface TerritoryGeoJSON {
   territory: any // Utilisation du type du cache
@@ -28,8 +32,7 @@ const TerritoryOverlay: React.FC<{
       className="fixed z-[9999] bg-lightnd dark:bg-darknd border border-muted/20 rounded-lg shadow-xl p-4 min-w-64 max-w-sm"
       style={{
         left: `${position.x}px`,
-        top: `${position.y}px`,
-        zIndex: 9999
+        top: `${position.y}px`
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -55,10 +58,9 @@ const TerritoryOverlay: React.FC<{
   )
 }
 
-const AllTerritory: React.FC = () => {
-  const { cache, loading, updateGpx, updateTerritories } = useTerritoryCache()
+const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updateTerritories } = useApiTerritory()
   const { content, type, error: fileError, readFile } = useFileReader()
-  const { loading: imgLoading, error: imgError, progress, generateImages } = useGenerate()
+  const { loading: imgLoading, error: imgError, progress, generateImages } = useApiGenerate()
   const { t } = useTranslation()
   const [territoriesGeoJSON, setTerritoriesGeoJSON] = useState<TerritoryGeoJSON[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +70,8 @@ const AllTerritory: React.FC = () => {
   const [mapKey, setMapKey] = useState<number>(0) // Clé pour forcer le re-render de la carte
   const [territories, setTerritories] = useState<any[]>([])
   const [showUpload, setShowUpload] = useState<boolean>(false) // Pour afficher le téléversement
-  const { config } = useConfig()
+  const { config, loading: configLoading } = useApiConfig()
+
   const calculateCenter = (geoJsonData: any[]): [number, number] => {
     if (geoJsonData.length === 0) return [45.5017, -73.5673]
 
@@ -109,8 +112,8 @@ const AllTerritory: React.FC = () => {
 
     return [totalLat / pointCount, totalLng / pointCount]
   }
+
   useEffect(() => {
-    // Convertir le GPX du cache en GeoJSON pour tous les territoires
     const convertGpxToGeoJSON = () => {
       try {
 
@@ -156,33 +159,46 @@ const AllTerritory: React.FC = () => {
     }
     if (!loading) {
       convertGpxToGeoJSON()
-    }  }, [cache, loading])
+    }
+  }, [cache, loading])
 
-  // Traitement du fichier téléversé
   useEffect(() => {
     (async () => {
       if (content && type) {
-        const parsed = parse(content, type)
-        setTerritories(parsed.sort((a, b) => a.num.localeCompare(b.num)))
-        if (parsed.length) {
-          await generateImages(parsed, (territorys) => {
-            setTerritories(territorys)
-            if (territorys.every(t => !t.isDefault && t.image)) {
-              updateGpx(makeGpx(parsed))
-              updateTerritories(territorys)
-            }
-          })
+        try {
+          setError(null)
+          const parsed = parse(content, type)
+          setTerritories(parsed.sort((a, b) => a.num.localeCompare(b.num)))
+          if (parsed.length) {
+            const gpxData = makeGpx(parsed)
+
+            // Sauvegarde des données au backend
+            await apiService.saveTerritoryData(gpxData)
+
+            // Mise à jour des données locales immédiatement
+            updateGpx(gpxData)
+
+            // Génération des images
+            await generateImages(parsed, (territorys: Territory[]) => {
+              setTerritories(territorys)
+              if (territorys.every((t: Territory) => !t.isDefault && t.image)) {
+                // On a déjà mis à jour le GPX, il suffit de mettre à jour les territoires
+                updateTerritories(territorys)
+              }
+            })
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du traitement du fichier:', error)
+          setError(`Erreur lors du traitement du fichier: ${error}`)
         }
+
       }
     })()
   }, [content, type, generateImages, updateGpx, updateTerritories])
 
-  // Gestionnaire de redimensionnement de la fenêtre
   useEffect(() => {
     const handleResize = () => {
-      // Fermer l'overlay s'il est ouvert lors du redimensionnement
       setSelectedTerritory(null)
-      // Forcer le re-render de la carte pour s'adapter aux nouvelles dimensions
       setMapKey(prev => prev + 1)
     }
 
@@ -202,7 +218,7 @@ const AllTerritory: React.FC = () => {
       setSelectedTerritory(territory)
     })
   }
-  if (loading || imgLoading) {
+  if (loading || imgLoading || configLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -212,7 +228,9 @@ const AllTerritory: React.FC = () => {
               progress.total > 0 ?
                 `Génération des territoires... ${progress.current}/${progress.total}` :
                 "Génération des territoires..."
-            ) : "Chargement des territoires..."}
+            ) : configLoading ?
+              "Chargement de la configuration..." :
+              "Chargement des territoires..."}
           </p>
           {imgLoading && progress.total > 0 && (
             <div className="mt-4 w-64 mx-auto">
@@ -276,7 +294,7 @@ const AllTerritory: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4 text-dark dark:text-light">
               Aucun territoire trouvé
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted mb-6">
               Il n'y a pas encore de territoires avec des données GPX. Téléversez un fichier CSV ou GPX pour commencer.
             </p>
             <FileUpload
@@ -290,20 +308,20 @@ const AllTerritory: React.FC = () => {
   }
   return (
     <div className="h-screen w-full relative">      <div className="bg-lightnd dark:bg-darknd border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-light">
-            Mon territoire ({territoriesGeoJSON.length} territoires)
-          </h1>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowUpload(true)}
-              className="btn-accent text-white inline-flex items-center gap-2"
-            >
-              📤 Re téléverser mes territoires
-            </button>
-          </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-light">
+          Mon territoire ({territoriesGeoJSON.length} territoires)
+        </h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowUpload(true)}
+            className="btn-accent text-white inline-flex items-center gap-2"
+          >
+            📤 Re téléverser mes territoires
+          </button>
         </div>
-      </div><div className="h-[calc(100vh-73px)] relative">
+      </div>
+    </div><div className="h-[calc(100vh-73px)] relative">
         <MapContainer
           key={mapKey}
           center={mapCenter}
@@ -317,17 +335,18 @@ const AllTerritory: React.FC = () => {
 
           {territoriesGeoJSON.map((item, index) => (
             <GeoJSON
-              key={`${item.territory.num}-${index}`}
-              data={item.geoJson}
+              key={`${item.territory.num}-${index}`}              data={item.geoJson}
               style={{
-                color: config.contourColor,
+                color: config?.contourColor || '#3388ff', // Couleur par défaut si config n'est pas chargé
                 weight: 3,
                 opacity: 0.8,
                 fillOpacity: 0.2
               }}
               onEachFeature={(_feature, layer) => onEachFeature(_feature, layer, item.territory)}
-            />          ))}        </MapContainer>
-      </div>      {/* Overlay personnalisé pour le territoire sélectionné */}
+            />))}
+        </MapContainer>
+      </div>
+      {/* Overlay personnalisé pour le territoire sélectionné */}
       {selectedTerritory && (
         <TerritoryOverlay
           territory={selectedTerritory}

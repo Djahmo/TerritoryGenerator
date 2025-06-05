@@ -5,20 +5,20 @@ import { handleGpxDownload } from '&/useFile'
 import MapCard from '@/components/modules/MapCard'
 import Input from '@/components/ui/Input'
 import { Search } from 'lucide-react'
-import { useTerritoryCache } from '@/hooks/useTerritoryCache'
+import { useApiTerritory } from '@/hooks/useApiTerritory'
 import { useNavigate } from 'react-router'
 
 const Territories: FC = () => {
   const { t } = useTranslation()
-  const { cache, updateTerritories } = useTerritoryCache()
+  const { cache, updateTerritories } = useApiTerritory()
   const navigate = useNavigate()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
     useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
+      console.log(cache.territories)
     } else {
-      // Rediriger vers la page d'accueil si aucun territoire en cache
       navigate('/')
     }
   }, [cache, navigate])

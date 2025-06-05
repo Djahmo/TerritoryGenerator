@@ -10,6 +10,8 @@ interface UserState {
   fetchMe: () => Promise<void>
   setUser: (user: User | null) => void
   logout: () => void
+  clearUserCache: () => void
+  getUsername: () => string
 }
 
 export const useUser = create<UserState>()(
@@ -17,9 +19,7 @@ export const useUser = create<UserState>()(
     (set, get) => ({
       user: null,
       loading: true,
-      initialized: false,
-
-      fetchMe: async () => {
+      initialized: false,      fetchMe: async () => {
         await checkOnlineStatus()
         if (!isOnline) {
           set({ loading: false, initialized: true })
@@ -42,8 +42,14 @@ export const useUser = create<UserState>()(
             createdAt: response.createdAt
           }
           set({ user })
-        } catch {
-          set({ user: null })
+        } catch (error: any) {
+          // Si l'utilisateur n'est pas trouvé côté serveur (401/404), on vide le cache local
+          if (error?.response?.status === 401 || error?.response?.status === 404) {
+            console.log('Utilisateur non trouvé côté serveur, nettoyage du cache local')
+            set({ user: null })
+          } else {
+            set({ user: null })
+          }
         } finally {
           set({ loading: false, initialized: true })
         }
@@ -51,11 +57,24 @@ export const useUser = create<UserState>()(
 
       setUser: (user) => set({ user }),
       logout: () => set({ user: null }),
+      clearUserCache: () => {
+        set({ user: null })
+        // Vider aussi le localStorage manuellement
+        localStorage.removeItem('user')
+      },
       getUsername: () => get().user?.username ?? '',
-    }),
-    {
+    }),    {
       name: 'user',
       partialize: (state) => ({ user: state.user }),
+      // Force la vérification utilisateur au démarrage
+      onRehydrateStorage: () => (state) => {
+        if (state?.user) {
+          // Si on a un utilisateur en cache, vérifier qu'il existe encore côté serveur
+          setTimeout(() => {
+            state.fetchMe()
+          }, 100)
+        }
+      }
     }
   )
 )

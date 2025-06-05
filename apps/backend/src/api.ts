@@ -1,5 +1,8 @@
 import Fastify from 'fastify'
 import { registerAuthRoutes } from './routes/auth.js'
+import { registerTerritoryRoutes } from './routes/territories.js'
+import { registerUserConfigRoutes } from './routes/userConfig.js'
+import { registerTerritoryLayersRoutes } from './routes/territoryLayers.js'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import env from './env.js'
@@ -28,6 +31,9 @@ await app.register(fastifyMultipart, {
 app.get('/ping', async () => ({ pong: true }))
 
 registerAuthRoutes(app)
+registerTerritoryRoutes(app)
+registerUserConfigRoutes(app)
+registerTerritoryLayersRoutes(app)
 
 app.listen({ port: env.API_PORT }, () => {
   console.log(`API server running at http://localhost:${env.API_PORT}`)

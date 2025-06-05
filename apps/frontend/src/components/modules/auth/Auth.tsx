@@ -14,7 +14,7 @@ import { redirect } from 'react-router'
 
 const Auth = () => {
   const { t } = useTranslation()
-  const { fetchMe, user } = useUser()
+  const { fetchMe, user, clearUserCache } = useUser()
   const [tab, setTab] = useState<'login' | 'register' | 'reset'>('login')
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ username: '', email: '', password: '', remember: false })
@@ -63,11 +63,18 @@ const Auth = () => {
   const handleCheckedChange = (checked: boolean) => {
     setForm({ ...form, remember: checked });
   };
-
   const handleLogout = async () => {
-    await sendApiC('/auth/logout')
-    await fetchMe()
-    redirect('/')
+    try {
+      await sendApiC('/auth/logout')
+      clearUserCache() // Vider le cache local
+      await fetchMe()
+      redirect('/')
+    } catch (error) {
+      // En cas d'erreur de déconnexion, vider quand même le cache local
+      console.warn('Erreur lors de la déconnexion, nettoyage du cache local')
+      clearUserCache()
+      redirect('/')
+    }
   }
 
   const handleSubmit = async () => {

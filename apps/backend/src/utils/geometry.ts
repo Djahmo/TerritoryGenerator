@@ -1,4 +1,4 @@
-import type { Coord } from "%/types"
+import type { Coord } from '../types/territory.js'
 
 /**
  * Calcule l'enveloppe convexe d'un ensemble de points en 2D
@@ -129,7 +129,6 @@ export const findOptimalOrientation = (
     hull: [] as [number, number][]
   }
 
-  // Test de différentes orientations basées sur les arêtes du convex hull
   for (let i = 0; i < hull.length; i++) {
     const a = hull[i]
     const b = hull[(i + 1) % hull.length]

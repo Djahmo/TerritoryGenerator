@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { Popover, PopoverTrigger, PopoverContent } from "#/ui/shadcn"
 import { ChromePicker, ColorResult } from "react-color"
-import { useConfig } from "@/hooks/useConfig"
+import { useApiConfig } from "@/hooks/useApiConfig"
 
 const getBackground = (color: string) => {
   const { a } = fromColorString(color)
@@ -46,16 +46,17 @@ type PickerProps = {
 const MAX_COLORS = 10
 
 const Picker: React.FC<PickerProps> = ({ value, onChange, label, className }) => {
-  const { config, setConfig } = useConfig()
+  const { config, updateConfig } = useApiConfig()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(fromColorString(value))
 
   const palette = React.useMemo(() => {
+    if (!config) return Array(MAX_COLORS).fill("rgba(255,255,255,1)")
     if (config.palette.length < MAX_COLORS) {
       return [...config.palette, ...Array(MAX_COLORS - config.palette.length).fill("rgba(255,255,255,1)")]
     }
     return config.palette.slice(0, MAX_COLORS)
-  }, [config.palette])
+  }, [config])
 
   const handlePickerChange = (c: ColorResult) => {
     const rgba = toRgbaString(c.rgb)
@@ -68,13 +69,24 @@ const Picker: React.FC<PickerProps> = ({ value, onChange, label, className }) =>
     setDraft(fromColorString(rgba))
     onChange(rgba)
   }
-  const handleCaseContextMenu = (idx: number, e: React.MouseEvent) => {
+
+  const handleCaseContextMenu = async (idx: number, e: React.MouseEvent) => {
     e.preventDefault()
+    if (!config) return
+
     const rgba = toRgbaString(draft)
     if (palette[idx] !== rgba) {
-      const newPalette = [...palette]
+      const newPalette = [...config.palette]
+      // Si la palette est plus courte que l'index, on l'étend
+      while (newPalette.length <= idx) {
+        newPalette.push("rgba(255,255,255,1)")
+      }
       newPalette[idx] = rgba
-      setConfig(cfg => ({ ...cfg, palette: newPalette }))
+      try {
+        await updateConfig({ palette: newPalette })
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour de la palette:', error)
+      }
     }
   }
 

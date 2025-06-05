@@ -14,3 +14,5 @@ const pool = mysql.createPool({
 export const db = drizzle(pool, { schema, mode: 'default' })
 
 export * from './users/index.js'
+export * from './territories/index.js'
+export * from './userConfig/index.js'

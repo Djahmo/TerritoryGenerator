@@ -4,10 +4,10 @@ import { Link } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import LanguageSelector from '../LanguageSelector'
 import ThemeSelector from '../ThemeSelector'
-import { useTerritoryCache } from '&/useTerritoryCache'
+import { useApiTerritory } from '&/useApiTerritory'
 const SideNav: FC = () => {
   const { t } = useTranslation()
-  const { cache } = useTerritoryCache()
+  const { cache } = useApiTerritory()
 
   const hasTerritoriesInCache = cache?.territories && cache.territories.length > 0
   const links = [

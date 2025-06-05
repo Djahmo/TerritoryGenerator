@@ -2,8 +2,8 @@ import { useParams, useNavigate } from "react-router"
 import { useTranslation } from "react-i18next"
 import { useCallback } from "react"
 import Wrapper from "#/ui/Wrapper"
-import { useTerritoryCache } from "@/hooks/useTerritoryCache"
-import { useGenerate } from "@/hooks/useGenerate"
+import { useApiTerritory } from "@/hooks/useApiTerritory"
+import { useApiGenerate } from "@/hooks/useApiGenerate"
 import Paint from "@/components/modules/paint/index"
 import { useEffect, useState } from "react"
 import Loader from "#/ui/Loader"
@@ -11,17 +11,14 @@ import Input from "#/ui/Input"
 import Modal from "#/ui/Modal"
 import type { PaintLayer } from "%/types"
 import { toast } from "sonner"
-import { cropToBbox, calculateBoundingBox } from "@/utils/geometry"
-import { useConfig } from "@/hooks/useConfig"
+import { ApiTerritoryService } from "@/services/apiTerritoryService"
 
-const Territory = () => {
-  const { num } = useParams<{ num: string }>()
+const Territory = () => {  const { num } = useParams<{ num: string }>()
   const { t } = useTranslation()
-  const { cache, updateTerritories, updateTerritory } = useTerritoryCache()
-  const { generateThumbnailFromImage, generateLargeImage, generateLargeImageWithCrop } = useGenerate()
-  const { config, PHI } = useConfig()
+  const { cache, updateTerritories, updateTerritory } = useApiTerritory()
+  const { generateThumbnailFromImage, generateLargeImage, generateLargeImageWithCrop, generateStandardImage } = useApiGenerate()
   const navigate = useNavigate()
-  const territory = cache?.territories?.find(t => t.num === num)
+  const territory = cache?.territories?.find((t: any) => t.num === num)
   const [inputName, setInputName] = useState<string>("")
   const [isLarge, setIsLarge] = useState<boolean>(false)
   const [isGeneratingLarge, setIsGeneratingLarge] = useState<boolean>(false)
@@ -36,8 +33,9 @@ const Territory = () => {
       setInputName(territory.name);
     }
   }, [territory])
+
   const handleRename = () => {
-    const updatedTerritorys = cache?.territories.map(t => t.num === num ? { ...t, name: inputName } : t)
+    const updatedTerritorys = cache?.territories.map((t: any) => t.num === num ? { ...t, name: inputName } : t)
     if (updatedTerritorys) updateTerritories(updatedTerritorys)
   };
 
@@ -47,21 +45,29 @@ const Territory = () => {
     if (!isLarge && !territory.originalLarge) {
       setIsGeneratingLarge(true);
       try {
-        const largeImage = await generateLargeImage(territory);
-        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI);
+        const success = await generateLargeImage(territory);
 
-        // Vérifier si l'image est verticale (hauteur > largeur)
-        const img = new Image();
-        img.onload = () => {
-          setIsVertical(img.height > img.width);
-        };
-        img.src = largeImage;
+        if (success) {
+          // Récupérer l'URL de l'image
+          const apiService = new ApiTerritoryService();
+          const response = await apiService.getTerritoryImages(territory.num, 'large');
 
-        updateTerritory(num!, {
-          originalLarge: largeImage,
-          large: largeImage,
-          currentBboxLarge: initialBboxLarge
-        });
+          if (response.images && response.images.length > 0) {
+            const imageUrl = `/p${response.images[0].imageUrl}`;
+
+            // Vérifier si l'image est verticale (hauteur > largeur)
+            const img = new Image();
+            img.onload = () => {
+              setIsVertical(img.height > img.width);
+            };
+            img.src = imageUrl;
+
+            updateTerritory(num!, {
+              originalLarge: imageUrl,
+              large: imageUrl
+            });
+          }
+        }
       } catch (error) {
         toast.error(t("p.territory.generate_large_error"));
         setIsGeneratingLarge(false);
@@ -69,15 +75,16 @@ const Territory = () => {
       }
       setIsGeneratingLarge(false);
     }
-    const img = new Image();
-    img.onload = () => {
-      setIsVertical(img.height > img.width);
-      console.log(img.height, img.width)
-    };
-    img.src = territory.originalLarge!;
-    setIsLarge(!isLarge);
-  };
 
+    if (territory.originalLarge) {
+      const img = new Image();
+      img.onload = () => {
+        setIsVertical(img.height > img.width);
+      };
+      img.src = territory.originalLarge;
+      setIsLarge(!isLarge);
+    }
+  };
   const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
     if (!territory) return;
 
@@ -89,19 +96,23 @@ const Territory = () => {
       let updates: any = {};
 
       if (isLarge) {
+        // Pour le plan large, nous pouvons conserver l'image composite côté client
+        // car elle contient les annotations dessinées par l'utilisateur
         updates = {
           paintLayersLarge: layers,
-          large: compositeImage,
+          large: compositeImage, // Nous gardons l'image composite avec les annotations
           paintLayersImage: territory.paintLayersImage || [],
           image: territory.image,
           miniature: territory.miniature
         };
       } else {
+        // Pour l'image standard, nous conservons également l'image composite
+        // et générons une miniature localement
         const miniature = await generateThumbnailFromImage(compositeImage);
         updates = {
           paintLayersImage: layers,
-          image: compositeImage,
-          miniature: miniature,
+          image: compositeImage, // Image avec annotations
+          miniature: miniature,  // Miniature générée localement
           paintLayersLarge: territory.paintLayersLarge || [],
           large: territory.large,
           originalLarge: territory.originalLarge
@@ -111,48 +122,81 @@ const Territory = () => {
       updateTerritory(num!, updates);
       toast.success(t("p.territory.save_success"))
     } catch (error) {
+      // En cas d'erreur, nous sauvegardons au moins les couches de peinture
       if (isLarge) {
         updateTerritory(num!, { paintLayersLarge: layers })
       } else {
         updateTerritory(num!, { paintLayersImage: layers })
       }
+      toast.error("Erreur lors de la sauvegarde de l'image")
     }
   }
-
   const handleRegenerate = async () => {
     if (!territory) return
 
-    setIsRegenerating(true)
+    setIsRegenerating(true);
     try {
+      const apiService = new ApiTerritoryService();
+
       if (isLarge) {
-        const largeImage = await generateLargeImage(territory)
-        const initialBboxLarge = calculateBoundingBox(territory.polygon, true, config, PHI)
+        const success = await generateLargeImage(territory);
 
-        const img = new Image();
-        img.onload = () => {
-          setIsVertical(img.height > img.width);
-        };
-        img.src = largeImage;
+        if (success) {
+          // Récupérer l'URL de l'image
+          const response = await apiService.getTerritoryImages(territory.num, 'large');
 
-        updateTerritory(num!, {
-          originalLarge: largeImage,
-          large: largeImage,
-          currentBboxLarge: initialBboxLarge,
-          paintLayersLarge: [],
-          paintLayersImage: territory.paintLayersImage || [],
-          image: territory.image,
-          miniature: territory.miniature
-        })
+          if (response.images && response.images.length > 0) {
+            const imageUrl = `/p${response.images[0].imageUrl}`;
+
+            // Vérifier si l'image est verticale (hauteur > largeur)
+            const img = new Image();
+            img.onload = () => {
+              setIsVertical(img.height > img.width);
+            };
+            img.src = imageUrl;
+
+            updateTerritory(num!, {
+              originalLarge: imageUrl,
+              large: imageUrl,
+              paintLayersLarge: [],
+              paintLayersImage: territory.paintLayersImage || [],
+              image: territory.image,
+              miniature: territory.miniature
+            });
+          }
+        }
+
         toast.success(t("p.territory.regenerate_large_success"))
       } else {
-        updateTerritory(num!, {
-          original: territory.original,
-          image: territory.original || "",
-          paintLayersImage: [],
-          paintLayersLarge: territory.paintLayersLarge || [],
-          large: territory.large,
-          originalLarge: territory.originalLarge
-        })
+        const success = await generateStandardImage(territory);
+
+        if (success) {
+          // Récupérer l'URL de l'image
+          const response = await apiService.getTerritoryImages(territory.num, 'standard');
+
+          if (response.images && response.images.length > 0) {
+            const imageUrl = `/p${response.images[0].imageUrl}`;
+
+            // Récupérer aussi la miniature
+            const thumbnailResponse = await apiService.getTerritoryImages(territory.num, 'thumbnail');
+            let thumbnailUrl = territory.miniature;
+
+            if (thumbnailResponse.images && thumbnailResponse.images.length > 0) {
+              thumbnailUrl = `/p${thumbnailResponse.images[0].imageUrl}`;
+            }
+
+            updateTerritory(num!, {
+              original: imageUrl,
+              image: imageUrl,
+              miniature: thumbnailUrl,
+              paintLayersImage: [],
+              paintLayersLarge: territory.paintLayersLarge || [],
+              large: territory.large,
+              originalLarge: territory.originalLarge
+            });
+          }
+        }
+
         toast.success(t("p.territory.regenerate_success"))
       }
 
@@ -176,42 +220,81 @@ const Territory = () => {
     if (!territory) {
       return;
     }    setIsGeneratingCrop(true)
-
-    console.log('🔍 Crop data received:', cropData);
-
     try {
-      let originalBbox: [number, number, number, number];
+      // Calculer un bbox valide basé sur le polygone du territoire
+      const lats = territory.polygon.map(p => p.lat);
+      const lons = territory.polygon.map(p => p.lon);
+      
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLon = Math.min(...lons);
+      const maxLon = Math.max(...lons);
+      
+      // Ajouter une marge de 20% autour du territoire
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLon = (minLon + maxLon) / 2;
+      const height = (maxLat - minLat) * 1.2; // 20% de marge
+      const width = (maxLon - minLon) * 1.2;  // 20% de marge
+      
+      const validBbox: [number, number, number, number] = [
+        centerLon - width/2,
+        centerLat - height/2,
+        centerLon + width/2,
+        centerLat + height/2
+      ];
+      
+      console.log("Génération d'image avec bbox calculé:", validBbox);
+      const success = await generateLargeImageWithCrop(territory, validBbox, cropData)
 
-      if (isLarge && territory.currentBboxLarge) {
-        originalBbox = territory.currentBboxLarge;
-      } else {
-        originalBbox = calculateBoundingBox(territory.polygon, isLarge, config, PHI);
-      }      const newBbox = cropToBbox(originalBbox, cropData)
-      const croppedImage = await generateLargeImageWithCrop(territory, newBbox, cropData)
+      if (success) {
+        const apiService = new ApiTerritoryService();
 
-      if (isLarge) {
-        updateTerritory(num!, {
-          originalLarge: croppedImage,
-          large: croppedImage,
-          currentBboxLarge: newBbox,
-          paintLayersLarge: [],
-          paintLayersImage: territory.paintLayersImage || [],
-          image: territory.image,
-          miniature: territory.miniature
-        })
-        toast.success("Plan large mis à jour avec le crop - contour du territoire redessiné")
-      } else {
-        const miniature = await generateThumbnailFromImage(croppedImage)
-        updateTerritory(num!, {
-          original: croppedImage,
-          image: croppedImage,
-          miniature: miniature,
-          paintLayersImage: [],
-          paintLayersLarge: territory.paintLayersLarge || [],
-          large: territory.large,
-          originalLarge: territory.originalLarge
-        })
-        toast.success("Image mise à jour avec le crop - contour du territoire redessiné")
+        if (isLarge) {
+          // Récupérer l'URL de l'image
+          const response = await apiService.getTerritoryImages(territory.num, 'large');
+
+          if (response.images && response.images.length > 0) {
+            const imageUrl = `/p${response.images[0].imageUrl}`;
+
+            updateTerritory(num!, {
+              originalLarge: imageUrl,
+              large: imageUrl,
+              paintLayersLarge: [],
+              paintLayersImage: territory.paintLayersImage || [],
+              image: territory.image,
+              miniature: territory.miniature
+            });
+          }
+
+          toast.success("Plan large mis à jour avec le crop - contour du territoire redessiné")
+        } else {
+          // Récupérer l'URL de l'image standard
+          const response = await apiService.getTerritoryImages(territory.num, 'standard');
+
+          if (response.images && response.images.length > 0) {
+            const imageUrl = `/p${response.images[0].imageUrl}`;
+
+            // Récupérer aussi la miniature
+            const thumbnailResponse = await apiService.getTerritoryImages(territory.num, 'thumbnail');
+            let thumbnailUrl = territory.miniature;
+
+            if (thumbnailResponse.images && thumbnailResponse.images.length > 0) {
+              thumbnailUrl = `/p${thumbnailResponse.images[0].imageUrl}`;
+            }
+
+            updateTerritory(num!, {
+              original: imageUrl,
+              image: imageUrl,
+              miniature: thumbnailUrl,
+              paintLayersImage: [],
+              paintLayersLarge: territory.paintLayersLarge || [],
+              large: territory.large,
+              originalLarge: territory.originalLarge
+            });
+          }
+
+          toast.success("Image mise à jour avec le crop - contour du territoire redessiné")
+        }
       }
 
       setPaintKey(prev => prev + 1)
@@ -220,7 +303,7 @@ const Territory = () => {
     } finally {
       setIsGeneratingCrop(false)
     }
-  }, [territory, isLarge, config, PHI, generateLargeImageWithCrop, generateThumbnailFromImage, updateTerritory, num])
+  }, [territory, isLarge, generateLargeImageWithCrop, generateThumbnailFromImage, updateTerritory, num])
 
   if (!territory)
     return (

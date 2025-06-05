@@ -5,7 +5,7 @@ import Wrapper from '#/ui/Wrapper'
 import Input from '#/ui/Input'
 import { Slider, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/ui/shadcn'
 import SeparatorX from '#/ui/SeparatorX'
-import { useConfig } from '@/hooks/useConfig'
+import { useApiConfig } from '@/hooks/useApiConfig'
 import { Download, Upload, RotateCcw } from 'lucide-react'
 import Picker from '#/modules/paint/components/Picker'
 import Auth from '@/components/modules/auth/Auth'
@@ -14,14 +14,16 @@ const Configuration = () => {
   const { t } = useTranslation()
   const {
     config,
-    setConfig,
-    exportConfig,
-    importConfig,
+    loading,
+    updateConfig,
+    setConfigProperty,
+    resetConfig,
     finalWidth,
     finalHeight,
     largeFinalWidth,
     largeFinalHeight
-  } = useConfig()
+  } = useApiConfig()
+
   const [importText, setImportText] = useState('')
   const [selectedPaletteColor, setSelectedPaletteColor] = useState('rgba(255,255,255,1)')
 
@@ -35,7 +37,9 @@ const Configuration = () => {
     { name: 'Ratio d\'or portrait', value: '1:φ', ratioX: 1, ratioY: 1.618 },
     { name: 'Carré', value: '1:1', ratioX: 1, ratioY: 1 }
   ]
+
   const getCurrentRatioValue = () => {
+    if (!config) return 'custom'
     const current = predefinedRatios.find(r =>
       Math.abs(r.ratioX - config.ratioX) < 0.01 && Math.abs(r.ratioY - config.ratioY) < 0.01
     )
@@ -43,73 +47,99 @@ const Configuration = () => {
   }
 
   const getCurrentLargeRatioValue = () => {
+    if (!config) return 'custom'
     const current = predefinedRatios.find(r =>
       Math.abs(r.ratioX - config.largeRatioX) < 0.01 && Math.abs(r.ratioY - config.largeRatioY) < 0.01
     )
     return current?.value || 'custom'
   }
-  const handleRatioChange = (value: string) => {
+
+  const handleRatioChange = async (value: string) => {
     const selectedRatio = predefinedRatios.find(r => r.value === value)
     if (selectedRatio) {
-      // Mise à jour atomique des deux valeurs de ratio en une seule opération
-      setConfig(c => ({
-        ...c,
+      await updateConfig({
         ratioX: selectedRatio.ratioX,
         ratioY: selectedRatio.ratioY
-      }))
-
-      // Afficher une notification pour confirmer le changement
+      })
       toast.success(`Ratio modifié : ${selectedRatio.name}`)
     }
   }
 
-  const handleLargeRatioChange = (value: string) => {
+  const handleLargeRatioChange = async (value: string) => {
     const selectedRatio = predefinedRatios.find(r => r.value === value)
     if (selectedRatio) {
-      // Mise à jour atomique des deux valeurs de ratio en une seule opération
-      setConfig(c => ({
-        ...c,
+      await updateConfig({
         largeRatioX: selectedRatio.ratioX,
         largeRatioY: selectedRatio.ratioY
-      }))
-
-      // Afficher une notification pour confirmer le changement
+      })
       toast.success(`Ratio des plans larges modifié : ${selectedRatio.name}`)
     }
   }
 
   const handleExport = () => {
-    const configString = exportConfig()
+    if (!config) return
+    const configString = JSON.stringify(config, null, 2)
     navigator.clipboard.writeText(configString)
     toast.success('Configuration copiée dans le presse-papiers')
   }
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!importText.trim()) {
       toast.error('Veuillez entrer une configuration à importer')
       return
     }
 
-    const success = importConfig(importText.trim())
-    if (success) {
+    try {
+      const configData = JSON.parse(importText.trim())
+      await updateConfig(configData)
       toast.success('Configuration importée avec succès')
       setImportText('')
-    } else {
+    } catch (error) {
       toast.error('Format de configuration invalide')
     }
   }
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration ?')) {
-      // Reset to default by removing from localStorage and reloading
-      localStorage.removeItem('paint-config-v1')
-      window.location.reload()
+      try {
+        await resetConfig()
+        toast.success('Configuration réinitialisée')
+      } catch (error) {
+        toast.error('Erreur lors de la réinitialisation')
+      }
     }
+  }
+
+  const handlePaletteColorChange = async (index: number, color: string) => {
+    if (!config) return
+    const newPalette = [...config.palette]
+    newPalette[index] = color
+    await setConfigProperty('palette', newPalette)
+  }
+
+  if (loading) {
+    return (
+      <Wrapper className='overflow-y-auto h-full'>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin w-8 h-8 border-4 border-positive border-t-transparent rounded-full"></div>
+        </div>
+      </Wrapper>
+    )
+  }
+
+  if (!config) {
+    return (
+      <Wrapper className='overflow-y-auto h-full'>
+        <div className="flex items-center justify-center h-full">
+          <Auth />
+        </div>
+      </Wrapper>
+    )
   }
 
   return (
     <Wrapper className='overflow-y-auto h-full'>
       <div className="max-w-4xl mx-auto p-6 space-y-8">
-        <Auth/>
+        <Auth />
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {t('config.title', 'Configuration')}
@@ -121,8 +151,7 @@ const Configuration = () => {
 
         {/* Actions globales */}
         <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Actions</h2>
-          <div className="flex flex-wrap gap-4">
+          <h2 className="text-xl font-semibold mb-4">Actions</h2>          <div className="flex flex-wrap gap-4">
             <button
               onClick={handleExport}
               className="btn-positive flex items-center gap-2"
@@ -142,7 +171,8 @@ const Configuration = () => {
           <SeparatorX />
 
           <div className="space-y-4">
-            <h3 className="font-medium">Importer une configuration</h3>            <Input
+            <h3 className="font-medium">Importer une configuration</h3>
+            <Input
               type="text"
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
@@ -158,6 +188,7 @@ const Configuration = () => {
             </button>
           </div>
         </div>
+
         {/* Configuration du canvas/papier */}
         <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Canvas & Papier</h2>
@@ -170,9 +201,7 @@ const Configuration = () => {
             <div className="max-w-md">
               <Slider
                 value={[config.ppp]}
-                onValueChange={([value]) => {
-                  setConfig(c => ({ ...c, ppp: value }))
-                }}
+                onValueChange={([value]) => setConfigProperty('ppp', value)}
                 min={100}
                 max={250}
                 step={1}
@@ -244,9 +273,7 @@ const Configuration = () => {
                   </label>
                   <Slider
                     value={[config.largeFactor]}
-                    onValueChange={([value]) => {
-                      setConfig(c => ({ ...c, largeFactor: value }))
-                    }}
+                    onValueChange={([value]) => setConfigProperty('largeFactor', value)}
                     min={0.05}
                     max={0.8}
                     step={0.01}
@@ -274,15 +301,17 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Couleur du contour
-              </label>              <div className="flex gap-2">                <Picker
-                value={config.contourColor}
-                onChange={(color) => setConfig(c => ({ ...c, contourColor: color }))}
-                label="Couleur du contour"
-              />
+              </label>
+              <div className="flex gap-2">
+                <Picker
+                  value={config.contourColor}
+                  onChange={(color) => setConfigProperty('contourColor', color)}
+                  label="Couleur du contour"
+                />
                 <Input
                   type="text"
                   value={config.contourColor}
-                  onChange={(e) => setConfig(c => ({ ...c, contourColor: e.target.value }))}
+                  onChange={(e) => setConfigProperty('contourColor', e.target.value)}
                   placeholder="#ff0000"
                 />
               </div>
@@ -291,9 +320,10 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Épaisseur du contour
-              </label>              <Slider
+              </label>
+              <Slider
                 value={[config.contourWidth]}
-                onValueChange={([value]) => setConfig(c => ({ ...c, contourWidth: value }))}
+                onValueChange={([value]) => setConfigProperty('contourWidth', value)}
                 min={1}
                 max={20}
                 step={1}
@@ -305,9 +335,11 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Largeur des miniatures
-              </label>              <Input type="number"
+              </label>
+              <Input
+                type="number"
                 value={config.thumbnailWidth.toString()}
-                onChange={(e) => setConfig(c => ({ ...c, thumbnailWidth: parseInt(e.target.value) || 500 }))}
+                onChange={(e) => setConfigProperty('thumbnailWidth', parseInt(e.target.value) || 500)}
                 placeholder="Largeur des miniatures"
                 min={100}
                 max={1000}
@@ -315,7 +347,9 @@ const Configuration = () => {
               />
             </div>
           </div>
-        </div>        {/* Palette de couleurs */}
+        </div>
+
+        {/* Palette de couleurs */}
         <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Palette de couleurs</h2>
           <div className="flex gap-6">
@@ -325,8 +359,12 @@ const Configuration = () => {
                 {config.palette.map((color, index) => (
                   <div
                     key={`palette-${index}-${color}`}
-                    className="w-16 h-16 rounded border border-muted/50"
+                    className="w-16 h-16 rounded border border-muted/50 cursor-pointer"
                     style={{ backgroundColor: color }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      handlePaletteColorChange(index, selectedPaletteColor)
+                    }}
                   />
                 ))}
               </div>
@@ -353,9 +391,11 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Nombre de tentatives
-              </label>              <Input type="number"
+              </label>
+              <Input
+                type="number"
                 value={config.networkRetries.toString()}
-                onChange={(e) => setConfig(c => ({ ...c, networkRetries: parseInt(e.target.value) || 3 }))}
+                onChange={(e) => setConfigProperty('networkRetries', parseInt(e.target.value) || 3)}
                 placeholder="Nombre de tentatives"
                 min={1}
                 max={10}
@@ -365,9 +405,11 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Délai entre tentatives (ms)
-              </label>              <Input type="number"
+              </label>
+              <Input
+                type="number"
                 value={config.networkDelay.toString()}
-                onChange={(e) => setConfig(c => ({ ...c, networkDelay: parseInt(e.target.value) || 1000 }))}
+                onChange={(e) => setConfigProperty('networkDelay', parseInt(e.target.value) || 1000)}
                 placeholder="Délai entre tentatives"
                 min={100}
                 max={10000}
@@ -378,9 +420,11 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Limite API IGN (ms)
-              </label>              <Input type="number"
+              </label>
+              <Input
+                type="number"
                 value={config.ignApiRateLimit.toString()}
-                onChange={(e) => setConfig(c => ({ ...c, ignApiRateLimit: parseInt(e.target.value) || 40 }))}
+                onChange={(e) => setConfigProperty('ignApiRateLimit', parseInt(e.target.value) || 40)}
                 placeholder="Limite API IGN"
                 min={10}
                 max={1000}
@@ -397,20 +441,24 @@ const Configuration = () => {
             <div>
               <label className="block text-sm font-medium mb-2">
                 URL de base
-              </label>              <Input type="text"
+              </label>
+              <Input
+                type="text"
                 value={config.ignApiBaseUrl}
-                onChange={(e) => setConfig(c => ({ ...c, ignApiBaseUrl: e.target.value }))}
+                onChange={(e) => setConfigProperty('ignApiBaseUrl', e.target.value)}
                 placeholder="https://data.geopf.fr/wms-r"
               />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Couche
-                </label>                <Input type="text"
+                </label>
+                <Input
+                  type="text"
                   value={config.ignApiLayer}
-                  onChange={(e) => setConfig(c => ({ ...c, ignApiLayer: e.target.value }))}
+                  onChange={(e) => setConfigProperty('ignApiLayer', e.target.value)}
                   placeholder="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"
                 />
               </div>
@@ -418,7 +466,8 @@ const Configuration = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Format
-                </label>                <Select value={config.ignApiFormat} onValueChange={(value) => setConfig(c => ({ ...c, ignApiFormat: value }))}>
+                </label>
+                <Select value={config.ignApiFormat} onValueChange={(value) => setConfigProperty('ignApiFormat', value)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -428,6 +477,18 @@ const Configuration = () => {
                     <SelectItem value="image/webp">WebP</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  CRS
+                </label>
+                <Input
+                  type="text"
+                  value={config.ignApiCRS}
+                  onChange={(e) => setConfigProperty('ignApiCRS', e.target.value)}
+                  placeholder="EPSG:3857"
+                />
               </div>
             </div>
           </div>

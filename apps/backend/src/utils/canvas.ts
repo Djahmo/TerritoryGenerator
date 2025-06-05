@@ -1,3 +1,5 @@
+import { createCanvas, CanvasRenderingContext2D, Canvas, Image } from 'canvas'
+
 /**
  * Types pour les opérations de canvas
  */
@@ -81,7 +83,7 @@ export const drawContour = (
  */
 export const rotateCanvas = (
   ctx: CanvasRenderingContext2D,
-  image: ImageBitmap,
+  image: Canvas | Image,
   angle: number,
   centerX: number,
   centerY: number
@@ -97,16 +99,14 @@ export const rotateCanvas = (
  * Effectue un crop et redimensionnement d'un canvas
  */
 export const cropAndResize = (
-  sourceCanvas: HTMLCanvasElement,
+  sourceCanvas: Canvas,
   sourceRect: { x: number, y: number, width: number, height: number },
   targetWidth: number,
   targetHeight: number
-): HTMLCanvasElement => {
-  const canvas = document.createElement('canvas')
-  canvas.width = targetWidth
-  canvas.height = targetHeight
+): Canvas => {
+  const canvas = createCanvas(targetWidth, targetHeight)
+  const ctx = canvas.getContext('2d')
 
-  const ctx = canvas.getContext('2d')!
   ctx.drawImage(
     sourceCanvas,
     sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height,
@@ -120,20 +120,18 @@ export const cropAndResize = (
  * Retourne un canvas si nécessaire (correction de l'orientation)
  */
 export const flipCanvasIfNeeded = (
-  canvas: HTMLCanvasElement,
+  canvas: Canvas,
   angle: number
-): HTMLCanvasElement => {
+): Canvas => {
   const isUpsideDown = Math.abs(Math.abs(angle) - Math.PI) < Math.PI / 2
 
   if (!isUpsideDown) {
     return canvas
   }
 
-  const flippedCanvas = document.createElement('canvas')
-  flippedCanvas.width = canvas.width
-  flippedCanvas.height = canvas.height
+  const flippedCanvas = createCanvas(canvas.width, canvas.height)
+  const ctx = flippedCanvas.getContext('2d')
 
-  const ctx = flippedCanvas.getContext('2d')!
   ctx.translate(canvas.width / 2, canvas.height / 2)
   ctx.rotate(Math.PI)
   ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2)
@@ -146,5 +144,6 @@ export const flipCanvasIfNeeded = (
  */
 export const setCanvasQuality = (ctx: CanvasRenderingContext2D): void => {
   ctx.imageSmoothingEnabled = true
+  // @ts-ignore - imageSmoothingQuality is not in types but exists in canvas library
   ctx.imageSmoothingQuality = 'high'
 }
