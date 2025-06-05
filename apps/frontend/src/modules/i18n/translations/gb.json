@@ -1,7 +1,6 @@
 {
   "language": "English",
   "p": {
-    "home": {},
     "notfound": {
       "title": "Oops... this page doesn't exist 🕵️‍♂️",
       "description": "The page you're looking for doesn't exist or has been deleted.",
@@ -16,10 +15,48 @@
       "confirm_regenerate_title": "Confirm regeneration",
       "confirm_regenerate_standard": "Are you sure you want to regenerate the standard image? This action will retrieve a new image, and all current modifications will be lost.",
       "confirm_regenerate_large": "Are you sure you want to regenerate the large plan? This action will retrieve a new image, and all current modifications will be lost."
+    },
+    "confirmAccount": {
+      "loading": "Confirming your account...",
+      "success": "Your account has been successfully confirmed!",
+      "error": "Invalid or expired link.",
+      "back": "Back to home"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "placeholder": "New password",
+      "confirm": "Confirm password",
+      "error": "An error occurred while resetting your password.",
+      "success": "Your password has been successfully reset! You can now log in."
     }
   },
   "c": {
-    "md": {},
+    "md": {
+      "auth": {
+        "common": {
+          "email": "Email address",
+          "password": "Password",
+          "forget": "Forgot password?",
+          "reset": "Reset password",
+          "needLogin": "You need to log in to use this feature."
+        },
+        "logout": "Log out",
+        "login": {
+          "title": "Login",
+          "submit": "Sign in",
+          "forgot": "Forgot password?",
+          "remember": "Keep me signed in",
+          "register": "Create an account"
+        },
+        "register": {
+          "username": "Username",
+          "title": "Create an account",
+          "confirmPassword": "Confirm password",
+          "submit": "Register",
+          "login": "Already registered? Sign in"
+        }
+      }
+    },
     "ux": {
       "nav": {
         "home": "My Territory",
@@ -57,6 +94,55 @@
       "october": "October",
       "november": "November",
       "december": "December"
+    },
+    "inputCondition": {
+      "username": "Between 3 and 20 characters",
+      "email": "Must be valid",
+      "password": {
+        "length": "Between 8 and 64 characters",
+        "lowercase": "A lowercase letter",
+        "uppercase": "An uppercase letter",
+        "number": "A number",
+        "special": "A special character"
+      }
+    }
+  },
+  "api": {
+    "success": {
+      "auth": {
+        "login": "Login successful!",
+        "register": "Registration successful! A confirmation email has been sent.",
+        "reset": "A password reset email has been sent."
+      }
+    },
+    "error": {
+      "unauthorized": "You are not authorized to perform this action.",
+      "internalServerError": "An internal server error occurred.",
+      "auth": {
+        "username": {
+          "tooShort": "Username is too short (minimum 3 characters).",
+          "tooLong": "Username is too long (maximum 20 characters).",
+          "invalidChars": "Username can only contain letters, numbers, or underscores."
+        },
+        "email": {
+          "invalid": "The email address is invalid.",
+          "send": "An error occurred while sending the email.",
+          "notFound": "No user found with this email address."
+        },
+        "password": {
+          "invalidChars": "The password contains invalid characters.",
+          "tooShort": "The password is too short.",
+          "tooLong": "The password is too long."
+        },
+        "invalidCredentials": "Invalid credentials.",
+        "invalidOrExpiredToken": "The link is invalid or has expired.",
+        "alreadyExists": "An account with this username or email already exists.",
+        "alreadyVerified": "This account is already verified.",
+        "userNotFound": "User not found."
+      },
+      "me": {
+        "fetch": "Unable to fetch user information."
+      }
     }
   }
 }

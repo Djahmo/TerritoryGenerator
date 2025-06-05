@@ -10,7 +10,11 @@
   ],
   "scripts": {
     "dev": "npm --workspace=frontend run dev",
-    "build": "npm --workspace=frontend run build"
+    "devapi": "npm --workspace=backend run dev",
+    "build": "npm --workspace=frontend run build",
+    "drizzle:push": "npm --workspace=backend run drizzle:push",
+    "drizzle:generate": "npm --workspace=backend run drizzle:generate",
+    "drizzle:migrate": "npm --workspace=backend run drizzle:migrate"
   },
   "keywords": [],
   "author": "",

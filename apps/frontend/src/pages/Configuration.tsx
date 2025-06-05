@@ -8,6 +8,7 @@ import SeparatorX from '#/ui/SeparatorX'
 import { useConfig } from '@/hooks/useConfig'
 import { Download, Upload, RotateCcw } from 'lucide-react'
 import Picker from '#/modules/paint/components/Picker'
+import Auth from '@/components/modules/auth/Auth'
 
 const Configuration = () => {
   const { t } = useTranslation()
@@ -108,6 +109,7 @@ const Configuration = () => {
   return (
     <Wrapper className='overflow-y-auto h-full'>
       <div className="max-w-4xl mx-auto p-6 space-y-8">
+        <Auth/>
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {t('config.title', 'Configuration')}

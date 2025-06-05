@@ -41,14 +41,14 @@ const Modal = ({ children, isOpen, className, onClose }: ModalProps) => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.1 }}
-          className="fixed inset-0 z-50 flex items-center justify-center md:bottom-0 bottom-16 bg-black/40 dark:text-lightnd text-darknd"
+          className="fixed inset-0 z-50 h-screen flex items-center justify-center md:bottom-0 bottom-16 bg-black/40 dark:text-lightnd text-darknd"
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.1 }}
-            className="bg-lightnd dark:bg-dark rounded-md max-w-[90vw] shadow-lg border border-muted/20 relative overflow-y-auto overflow-x-hidden scrollbar-hide"
+            className="bg-lightnd dark:bg-dark rounded-md max-w-[90vw] shadow-lg border border-muted/20 relative overflow-y-auto overflow-x-hidden"
           >
             <div
               ref={innerRef}

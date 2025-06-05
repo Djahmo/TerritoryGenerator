@@ -1,7 +1,6 @@
 {
   "language": "Français",
   "p": {
-    "home": {},
     "notfound": {
       "title": "Oups... cette page n'existe pas 🕵️‍♂️",
       "description": "La page que vous cherchez n'existe pas ou a été supprimée.",
@@ -16,10 +15,48 @@
       "confirm_regenerate_title": "Confirmer la régénération",
       "confirm_regenerate_standard": "Êtes-vous sûr de vouloir régénérer l'image resserée ? Cette action récupérera une nouvelle image et supprimera les modifications actuelles.",
       "confirm_regenerate_large": "Êtes-vous sûr de vouloir régénérer le plan large ? Cette action récupérera une nouvelle image et supprimera les modifications actuelles."
+    },
+    "confirmAccount": {
+      "loading": "Confirmation en cours...",
+      "success": "Ton compte a bien été confirmé !",
+      "error": "Lien invalide ou expiré.",
+      "back": "Retour à l'accueil"
+    },
+    "resetPassword": {
+      "title": "Réinitialiser le mot de passe",
+      "placeholder": "Nouveau mot de passe",
+      "confirm": "Confirmer le mot de passe",
+      "error": "Une erreur est survenue lors de la réinitialisation du mot de passe.",
+      "success": "Ton mot de passe a été réinitialisé avec succès ! Tu peux maintenant te connecter."
     }
   },
   "c": {
-    "md": {},
+    "md": {
+      "auth": {
+        "common": {
+          "email": "Adresse e-mail",
+          "password": "Mot de passe",
+          "forget": "Mot de passe oublié ?",
+          "reset": "Réinitialiser le mot de passe",
+          "needLogin": "Tu dois être connecté pour utiliser cette fonctionnalité."
+        },
+        "logout": "Déconnexion",
+        "login": {
+          "title": "Me connecter",
+          "submit": "Se connecter",
+          "forgot": "Mot de passe oublié ?",
+          "remember": "Rester connecté",
+          "register": "Créer un compte"
+        },
+        "register": {
+          "username": "Nom d'utilisateur",
+          "title": "Créer un compte",
+          "confirmPassword": "Confirmer le mot de passe",
+          "submit": "S’inscrire",
+          "login": "Déjà inscrit ? Se connecter"
+        }
+      }
+    },
     "ux": {
       "nav": {
         "home": "Mon territoire",
@@ -57,6 +94,55 @@
       "october": "Octobre",
       "november": "Novembre",
       "december": "Décembre"
+    },
+    "inputCondition": {
+      "username": "Entre 3 et 20 caractères",
+      "email": "Doit être valide",
+      "password": {
+        "length": "Entre 8 et 64 caractères",
+        "lowercase": "Une lettre minuscule",
+        "uppercase": "Une lettre majuscule",
+        "number": "Un chiffre",
+        "special": "Un caractère spécial"
+      }
+    }
+  },
+  "api": {
+    "success": {
+      "auth": {
+        "login": "Connexion réussie !",
+        "register": "Inscription réussie ! Un email de confirmation a été envoyé.",
+        "reset": "Un email de réinitialisation a été envoyé."
+      }
+    },
+    "error": {
+      "unauthorized": "Tu n'es pas autorisé à effectuer cette action.",
+      "internalServerError": "Une erreur interne est survenue.",
+      "auth": {
+        "username": {
+          "tooShort": "Le nom d'utilisateur est trop court (3 caractères minimum).",
+          "tooLong": "Le nom d'utilisateur est trop long (20 caractères maximum).",
+          "invalidChars": "Le nom d'utilisateur ne peut contenir que des lettres, chiffres ou underscores."
+        },
+        "email": {
+          "invalid": "L'adresse email est invalide.",
+          "send": "Une erreur est survenue lors de l'envoi de l'email.",
+          "notFound": "Aucun utilisateur trouvé avec cette adresse email."
+        },
+        "password": {
+          "invalidChars": "Le mot de passe contient des caractères non autorisés.",
+          "tooShort": "Le mot de passe est trop court.",
+          "tooLong": "Le mot de passe est trop long."
+        },
+        "invalidCredentials": "Identifiants incorrects.",
+        "invalidOrExpiredToken": "Le lien est invalide ou a expiré.",
+        "alreadyExists": "Un compte avec ce nom d'utilisateur ou cet email existe déjà.",
+        "alreadyVerified": "Le compte est déjà confirmé.",
+        "userNotFound": "Utilisateur introuvable."
+      },
+      "me": {
+        "fetch": "Impossible de récupérer les informations utilisateur."
+      }
     }
   }
 }

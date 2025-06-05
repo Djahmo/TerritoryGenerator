@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Home, Menu, Settings } from 'lucide-react'
+import { Home, Settings, Map, Download, Menu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router'
 import ThemeSelector from '#/ux/ThemeSelector'
 import LanguageSelector from '#/ux/LanguageSelector'
+import { useTerritoryCache } from '&/useTerritoryCache'
 
 const BottomNav = () => {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const { cache } = useTerritoryCache()
 
+  const hasTerritoriesInCache = cache?.territories && cache.territories.length > 0
   const links = [
     { label: t('c.ux.nav.home'), icon: Home, href: '/' },
-    { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' },
+    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.allTerritories', 'Mes territoires'), icon: Map, href: '/territories' }] : []),
+    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.exportation', 'Exportation'), icon: Download, href: '/exportation' }] : []),
+    { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' }
   ]
 
   useEffect(() => {

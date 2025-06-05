@@ -312,7 +312,7 @@ const AllTerritory: React.FC = () => {
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="/api/tiles/{z}/{x}/{y}.png"
+            url="/tiles/{z}/{x}/{y}.png"
           />
 
           {territoriesGeoJSON.map((item, index) => (
