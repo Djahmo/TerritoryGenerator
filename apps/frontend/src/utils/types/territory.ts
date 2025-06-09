@@ -90,7 +90,7 @@ export type Territory = {
   large?: string
   miniature?: string
 
-  isDefault: boolean
+  isDefault?: boolean
 }
 
 export type TerritoryCache = {

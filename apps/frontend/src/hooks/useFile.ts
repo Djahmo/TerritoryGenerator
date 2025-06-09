@@ -41,13 +41,12 @@ export const parseCsv = (csv: string): Territory[] => {
         lat: parseFloat(match[2]),
         lon: parseFloat(match[1]),
       }));
-    if (!polygon.length) return null;
-    const parts = line.split(',')
+    if (!polygon.length) return null;    const parts = line.split(',')
     let num = (parts[4] || '') + (parts[3] || '') || 'Territoire'
     let name = parts[2] || ''
     name = name.replace(/ï¿½/g, 'è').trim()
 
-    return { num, polygon, name, isDefault: true }
+    return { num, polygon, name }
   }).filter(Boolean) as Territory[]
 }
 
@@ -66,7 +65,7 @@ export const parseGpx = (xml: string): Territory[] => {
       lat: parseFloat(pt.getAttribute("lat") || "0"),
       lon: parseFloat(pt.getAttribute("lon") || "0"),
     }))
-    return { num, polygon, name, isDefault: true }
+    return { num, polygon, name }
   }).filter(t => t.polygon.length > 0)
 }
 

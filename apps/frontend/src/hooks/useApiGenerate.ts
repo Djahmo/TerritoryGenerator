@@ -6,22 +6,15 @@ export const useApiGenerate = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 })
-  const defaultImageRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Service API pour les territoires
   const apiService = new ApiTerritoryService()
-
   // Fonction principale de génération d'images via API
   const generateImages = useCallback(async (
     territories: Territory[],
     callback: (territories: Territory[]) => void
   ) => {
-    if (!defaultImageRef.current) {
-      setError("Image par défaut non chargée")
-      return
-    }
-
     setLoading(true)
     setError(null)
     setProgress({ current: 0, total: territories.length })
@@ -30,16 +23,8 @@ export const useApiGenerate = () => {
     abortControllerRef.current = new AbortController()
 
     try {
-      // Initialisation avec l'image par défaut
-      const initialTerritories: Territory[] = territories.map(territory => ({
-        ...territory,
-        miniature: defaultImageRef.current!,
-        image: '',
-        original: '',
-        originalLarge: '',
-        isDefault: true
-      }))
-
+      // Initialisation des territoires
+      const initialTerritories: Territory[] = [...territories]
       callback([...initialTerritories])
 
       // Compteur pour suivre les images terminées
@@ -60,10 +45,6 @@ export const useApiGenerate = () => {
                 resolve()
                 return
               }
-              const targetTerritory = initialTerritories.find(t => t.num === territory.num)
-              if (targetTerritory) {
-                targetTerritory.isDefault = false
-              }
 
               completedCount++
               setProgress({ current: completedCount, total: territories.length })
@@ -72,11 +53,10 @@ export const useApiGenerate = () => {
             } catch (error) {
               console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
               completedCount++
-              setProgress({ current: completedCount, total: territories.length })
-            } finally {
+              setProgress({ current: completedCount, total: territories.length })            } finally {
               resolve()
             }
-          }, index * 100) // Rate limiting réduit car l'API backend gère les requêtes
+          }, index * 1000) // Délai de 1 seconde entre chaque requête pour éviter la surcharge de l'API WMS
 
           // Enregistrer le timeout pour pouvoir l'annuler si nécessaire
           abortControllerRef.current?.signal.addEventListener('abort', () => {

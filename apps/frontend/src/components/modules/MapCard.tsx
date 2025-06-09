@@ -1,6 +1,5 @@
 import type { Territory } from "%/types/"
 import { useTranslation } from "react-i18next"
-import Loader from "@/components/ui/Loader"
 import { FC, useState } from "react"
 import { Check } from "lucide-react"
 import { Link } from "react-router"
@@ -13,7 +12,7 @@ type MapCardProps = {
 
 const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
   const { t } = useTranslation()
-  const { num, miniature, name, isDefault } = territory
+  const { num, miniature, name } = territory
 
   const [editMode, setEditMode] = useState(false)
   const [inputName, setInputNom] = useState(name || "")
@@ -51,15 +50,12 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
             <Check size={18} strokeWidth={3} />
           </button>
         </div>
-      )}
-
-      <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">
+      )}      <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">
         <img
           src={miniature}
           alt={`Territoire ${num}`}
           className={`object-contain w-full h-full transition-opacity duration-300 `}
         />
-        <Loader enabled={isDefault} />
       </Link>
     </div>
   )

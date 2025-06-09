@@ -210,4 +210,43 @@ export class ApiTerritoryService {
     const result = await response.json()
     return result.territories || []
   }
+
+  /**
+   * Met à jour un territoire complet avec ses images et layers
+   * Supprime les anciennes images/layers avant de sauvegarder les nouveaux pour éviter la duplication
+   */
+  async updateTerritoryComplete(territory: Territory): Promise<{ success: boolean }> {
+    const response = await fetch(`${this.baseUrl}/territories/${territory.num}/complete`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        territory: {
+          num: territory.num,
+          name: territory.name,
+          polygon: territory.polygon,
+          rotation: territory.rotation,
+          currentBboxLarge: territory.currentBboxLarge
+        },
+        images: {
+          image: territory.image,
+          large: territory.large,
+          miniature: territory.miniature
+        },
+        layers: {
+          paintLayersImage: territory.paintLayersImage || [],
+          paintLayersLarge: territory.paintLayersLarge || []
+        }
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Erreur HTTP ${response.status}`)
+    }
+
+    return { success: true }
+  }
 }

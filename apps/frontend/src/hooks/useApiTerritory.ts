@@ -59,8 +59,7 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
       get().saveToBackend().catch(console.error);
     }
   },
-
-  updateTerritoryLayers: (num: string, layers: PaintLayer[], isLarge: boolean = false) => {
+  updateTerritoryLayers: async (num: string, layers: PaintLayer[], isLarge: boolean = false) => {
     const prev = get().cache;
     if (!prev) return;
 
@@ -83,9 +82,20 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
       lastUpdate: Date.now()
     };
     set({ cache: newCache });
-  },
 
-  updateTerritory: (num: string, updates: Partial<Territory>) => {
+    // Sauvegarder automatiquement via l'API complète
+    const updatedTerritory = updatedTerritories.find(t => t.num === num);
+    if (updatedTerritory) {
+      try {
+        console.log(`🎨 Sauvegarde des couches de peinture pour le territoire ${num} (${isLarge ? 'large' : 'standard'})`);
+        await apiService.updateTerritoryComplete(updatedTerritory);
+        console.log(`✅ Couches de peinture du territoire ${num} sauvegardées avec succès`);
+      } catch (error) {
+        console.error(`❌ Erreur lors de la sauvegarde des couches du territoire ${num}:`, error);
+      }
+    }
+  },
+  updateTerritory: async (num: string, updates: Partial<Territory>) => {
     const prev = get().cache;
     if (!prev) {
       console.warn('updateTerritory: Cache non disponible');
@@ -120,9 +130,27 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
 
     set({ cache: newCache });
 
-    // Sauvegarder automatiquement en backend si on a des territoires complets
-    if (updatedTerritories.some(t => t.image || t.large)) {
-      get().saveToBackend().catch(console.error);
+    // Déterminer le territoire mis à jour
+    const updatedTerritory = updatedTerritories.find(t => t.num === num);
+      // Si des couches de peinture sont mises à jour ou le territoire contient des couches, utiliser l'API complète
+    const hasLayers = processedUpdates.paintLayersImage ||
+                     processedUpdates.paintLayersLarge ||
+                     (updatedTerritory && ((updatedTerritory.paintLayersImage && updatedTerritory.paintLayersImage.length > 0) ||
+                                          (updatedTerritory.paintLayersLarge && updatedTerritory.paintLayersLarge.length > 0)));
+
+    if (hasLayers && updatedTerritory) {
+      try {
+        console.log(`🎨 Sauvegarde complète du territoire ${num} avec couches de peinture`);
+        await apiService.updateTerritoryComplete(updatedTerritory);
+        console.log(`✅ Territoire ${num} sauvegardé avec succès`);
+      } catch (error) {
+        console.error(`❌ Erreur lors de la sauvegarde complète du territoire ${num}:`, error);
+      }
+    } else {
+      // Sauvegarder automatiquement en backend si on a des territoires complets
+      if (updatedTerritories.some(t => t.image || t.large)) {
+        get().saveToBackend().catch(console.error);
+      }
     }
   },
 

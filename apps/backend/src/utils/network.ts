@@ -64,7 +64,7 @@ export const buildIgnUrl = (
 
   // Pour WMS 1.3.0 avec EPSG:4326, les coordonnées sont dans l'ordre lat,lon
   // Pour les autres CRS (comme EPSG:3857), les coordonnées sont dans l'ordre lon,lat
-  const bboxStr = crs === 'EPSG:4326' 
+  const bboxStr = crs === 'EPSG:4326'
     ? `${minLat},${minLon},${maxLat},${maxLon}`
     : `${minLon},${minLat},${maxLon},${maxLat}`
 
@@ -81,5 +81,12 @@ export const buildIgnUrl = (
     FORMAT: format
   })
 
-  return `${baseUrl}?${params.toString()}`
+  const url = `${baseUrl}?${params.toString()}`
+
+  // Debug: afficher l'URL complète
+  console.log('🌐 URL WMS complète:', url)
+  console.log('📍 BBOX:', bboxStr)
+  console.log('📏 SIZE:', size)
+
+  return url
 }

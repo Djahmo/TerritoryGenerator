@@ -88,8 +88,14 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
   const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
     if (!territory) return;
 
+    console.log(`🎨 Territory.handleSave - Début de la sauvegarde du territoire ${territory.num}`)
+    console.log(`📊 Nombre de layers reçus:`, layers.length)
+    console.log(`🖼️ Image composite présente:`, !!compositeImage)
+    console.log(`📏 Type de vue:`, isLarge ? 'large' : 'standard')
+
     try {
       if (!compositeImage) {
+        console.log(`❌ Pas d'image composite, arrêt de la sauvegarde`)
         return;
       }
 
@@ -104,10 +110,10 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
           paintLayersImage: territory.paintLayersImage || [],
           image: territory.image,
           miniature: territory.miniature
+
         };
+        console.log(`🎨 Sauvegarde en mode LARGE - ${layers.length} layers`);
       } else {
-        // Pour l'image standard, nous conservons également l'image composite
-        // et générons une miniature localement
         const miniature = await generateThumbnailFromImage(compositeImage);
         updates = {
           paintLayersImage: layers,
@@ -117,7 +123,13 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
           large: territory.large,
           originalLarge: territory.originalLarge
         };
+        console.log(`🎨 Sauvegarde en mode STANDARD - ${layers.length} layers`);
       }
+
+      console.log(`📤 Appel de updateTerritory avec:`, {
+        territoryNum: num,
+        layersCount: isLarge ? updates.paintLayersLarge?.length : updates.paintLayersImage?.length
+      });
 
       updateTerritory(num!, updates);
       toast.success(t("p.territory.save_success"))
@@ -224,25 +236,25 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
       // Calculer un bbox valide basé sur le polygone du territoire
       const lats = territory.polygon.map(p => p.lat);
       const lons = territory.polygon.map(p => p.lon);
-      
+
       const minLat = Math.min(...lats);
       const maxLat = Math.max(...lats);
       const minLon = Math.min(...lons);
       const maxLon = Math.max(...lons);
-      
+
       // Ajouter une marge de 20% autour du territoire
       const centerLat = (minLat + maxLat) / 2;
       const centerLon = (minLon + maxLon) / 2;
       const height = (maxLat - minLat) * 1.2; // 20% de marge
       const width = (maxLon - minLon) * 1.2;  // 20% de marge
-      
+
       const validBbox: [number, number, number, number] = [
         centerLon - width/2,
         centerLat - height/2,
         centerLon + width/2,
         centerLat + height/2
       ];
-      
+
       console.log("Génération d'image avec bbox calculé:", validBbox);
       const success = await generateLargeImageWithCrop(territory, validBbox, cropData)
 

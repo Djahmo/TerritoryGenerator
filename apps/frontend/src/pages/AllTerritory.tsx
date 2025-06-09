@@ -58,7 +58,7 @@ const TerritoryOverlay: React.FC<{
   )
 }
 
-const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updateTerritories } = useApiTerritory()
+const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updateTerritories, loadFromBackend } = useApiTerritory()
   const { content, type, error: fileError, readFile } = useFileReader()
   const { loading: imgLoading, error: imgError, progress, generateImages } = useApiGenerate()
   const { t } = useTranslation()
@@ -161,7 +161,6 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
       convertGpxToGeoJSON()
     }
   }, [cache, loading])
-
   useEffect(() => {
     (async () => {
       if (content && type) {
@@ -181,11 +180,14 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
             // Génération des images
             await generateImages(parsed, (territorys: Territory[]) => {
               setTerritories(territorys)
-              if (territorys.every((t: Territory) => !t.isDefault && t.image)) {
-                // On a déjà mis à jour le GPX, il suffit de mettre à jour les territoires
-                updateTerritories(territorys)
-              }
-            })
+              // Mettre à jour les territoires après génération
+              updateTerritories(territorys)
+            })            // IMPORTANT: Recharger depuis le backend pour récupérer
+            // les territoires avec les layers et images associés
+            await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre un peu
+            console.log('🔄 Rechargement des territoires depuis le backend...')
+            await loadFromBackend()
+            console.log('✅ Territoires rechargés depuis le backend')
           }
         } catch (error) {
           console.error('❌ Erreur lors du traitement du fichier:', error)
@@ -194,7 +196,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
 
       }
     })()
-  }, [content, type, generateImages, updateGpx, updateTerritories])
+  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend])
 
   useEffect(() => {
     const handleResize = () => {
@@ -372,11 +374,17 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
             </div>
             <p className="text-gray-600 mb-6">
               Téléversez un nouveau fichier CSV ou GPX pour remplacer vos territoires actuels.
-            </p>
-            <FileUpload
-              onFile={file => {
+            </p>            <FileUpload
+              onFile={async (file) => {
                 readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')
                 setShowUpload(false)
+
+                // Attendre un peu puis recharger depuis le backend
+                setTimeout(async () => {
+                  console.log('🔄 Rechargement des territoires après re-téléversement...')
+                  await loadFromBackend()
+                  console.log('✅ Territoires rechargés après re-téléversement')
+                }, 2000) // 2 secondes pour laisser le temps au traitement
               }}
               loading={imgLoading}
             />

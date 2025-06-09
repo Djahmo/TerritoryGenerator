@@ -18,6 +18,51 @@ import {
 import { loadImageBuffer, buildIgnUrl } from '../utils/network.js'
 import { createThumbnail, createThumbnailFromDataUrl } from './thumbnailService.js'
 
+// Queue pour espacer les requêtes WMS
+class RequestQueue {
+  private queue: Array<() => Promise<any>> = []
+  private processing = false
+  private lastRequestTime = 0
+  private readonly minDelay = 1500 // 1.5 seconde entre chaque requête WMS
+
+  async add<T>(request: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await request()
+          resolve(result)
+        } catch (error) {
+          reject(error)
+        }
+      })
+      this.processQueue()
+    })
+  }
+
+  private async processQueue() {
+    if (this.processing || this.queue.length === 0) return
+
+    this.processing = true
+
+    while (this.queue.length > 0) {
+      const now = Date.now()
+      const timeSinceLastRequest = now - this.lastRequestTime
+
+      if (timeSinceLastRequest < this.minDelay) {
+        await new Promise(resolve => setTimeout(resolve, this.minDelay - timeSinceLastRequest))
+      }
+
+      const request = this.queue.shift()!
+      this.lastRequestTime = Date.now()
+      await request()
+    }
+
+    this.processing = false
+  }
+}
+
+const wmsQueue = new RequestQueue()
+
 /**
  * Service principal pour la génération d'images de territoires côté backend
  */
@@ -62,9 +107,7 @@ export class TerritoryImageService {
     }
 
     // 1. Calcul de la bounding box
-    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)
-
-    // 2. Chargement de l'image de la carte
+    const bbox = calculateBoundingBox(territory.polygon, false, this.config, this.PHI)    // 2. Chargement de l'image de la carte
     const url = buildIgnUrl(bbox, this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
       layer: this.userConfig.ignApiLayer,
@@ -72,11 +115,11 @@ export class TerritoryImageService {
       crs: this.userConfig.ignApiCRS
     })
 
-    const imageBuffer = await loadImageBuffer(
+    const imageBuffer = await wmsQueue.add(() => loadImageBuffer(
       url,
       this.userConfig.networkRetries,
       this.userConfig.networkDelay
-    )
+    ))
     const mapImage = await loadImage(imageBuffer)
 
     // 3. Conversion du polygone en pixels
@@ -154,16 +197,15 @@ export class TerritoryImageService {
     // 2. Chargement de l'image
     const url = buildIgnUrl(bbox, this.dimensions.largeRawSize || this.dimensions.rawSize, {
       baseUrl: this.userConfig.ignApiBaseUrl,
-      layer: this.userConfig.ignApiLayer,
-      format: this.userConfig.ignApiFormat,
+      layer: this.userConfig.ignApiLayer,      format: this.userConfig.ignApiFormat,
       crs: this.userConfig.ignApiCRS
     })
 
-    const imageBuffer = await loadImageBuffer(
+    const imageBuffer = await wmsQueue.add(() => loadImageBuffer(
       url,
       this.userConfig.networkRetries,
       this.userConfig.networkDelay
-    )
+    ))
     const mapImage = await loadImage(imageBuffer)
 
     // 3. Création du canvas de base
@@ -256,15 +298,14 @@ export class TerritoryImageService {
       format: this.userConfig.ignApiFormat,
       crs: this.userConfig.ignApiCRS
     })
-    
-    console.log('GENERATE IMAGE: URL générée:', url.substring(0, 200) + '...');
+      console.log('GENERATE IMAGE: URL générée:', url.substring(0, 200) + '...');
 
     try {
-      const imageBuffer = await loadImageBuffer(
+      const imageBuffer = await wmsQueue.add(() => loadImageBuffer(
         url,
         this.userConfig.networkRetries,
         this.userConfig.networkDelay
-      )
+      ))
       console.log('GENERATE IMAGE: Image chargée avec succès');
       const mapImage = await loadImage(imageBuffer)
 

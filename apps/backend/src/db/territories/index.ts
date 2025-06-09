@@ -1,6 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm'
 import { db } from '../index.js'
-import { territoryImages, territoryData } from '../../schema/territories.js'
+import { territoryImages, territoryData, territoryLayers } from '../../schema/territories.js'
 import { nanoid } from 'nanoid'
 import { reconstructTerritoriesFromGpx } from '../../utils/gpxParser.js'
 import env from '../../env.js'
@@ -12,7 +12,7 @@ const FRONTEND_URL = env.FRONTEND_URL || "http://localhost:3000";
 export const createTerritoryImage = async (data: {
   userId: string
   territoryNumber: string
-  imageType: 'standard' | 'large' | 'miniature'
+  imageType: 'standard' | 'large' | 'miniature' | 'original' | 'originalLarge'
   fileName: string
   filePath: string
   fileSize: number
@@ -84,7 +84,33 @@ export const deleteTerritoryImage = async (userId: string, territoryNumber: stri
   await db
     .delete(territoryImages)
     .where(and(...whereConditions))
-    
+
+  // Retourner les chemins des fichiers pour pouvoir les supprimer
+  return imagesToDelete.map(img => img.filePath)
+}
+
+/**
+ * Supprime uniquement les images modifiées d'un territoire (pas les originales)
+ * Les types d'images originales à préserver : 'original', 'originalLarge'
+ */
+export const deleteModifiedTerritoryImages = async (userId: string, territoryNumber: string, imageType: 'standard' | 'large' | 'miniature') => {
+  let whereConditions = [
+    eq(territoryImages.userId, userId),
+    eq(territoryImages.territoryNumber, territoryNumber),
+    eq(territoryImages.imageType, imageType)
+  ]
+
+  // Récupérer les images à supprimer pour effacer aussi les fichiers
+  const imagesToDelete = await db
+    .select()
+    .from(territoryImages)
+    .where(and(...whereConditions))
+
+  // Supprimer les entrées de la base de données
+  await db
+    .delete(territoryImages)
+    .where(and(...whereConditions))
+
   // Retourner les chemins des fichiers pour pouvoir les supprimer
   return imagesToDelete.map(img => img.filePath)
 }
@@ -166,23 +192,52 @@ export const getReconstructedTerritories = async (userId: string) => {
   }
 
   // Reconstruire les territoires à partir du GPX
-  const territories = reconstructTerritoriesFromGpx(gpxData)
-
-  // Récupérer les images pour chaque territoire
+  const territories = reconstructTerritoriesFromGpx(gpxData)  // Récupérer les images et les layers pour chaque territoire
   if (territories.length > 0) {
     const images = await getTerritoryImagesByUser(userId);
+    const allLayers = await getTerritoryLayersByUser(userId);
+
     // Organiser les images par numéro de territoire et type
     const imagesByTerritory: Record<string, Record<string, string>> = {};
+
+    // Organiser les layers par numéro de territoire et type d'image
+    const layersByTerritory: Record<string, { paintLayersImage: any[], paintLayersLarge: any[] }> = {};
 
     images.forEach(img => {
       if (!imagesByTerritory[img.territoryNumber]) {
         imagesByTerritory[img.territoryNumber] = {};
       }
-
       imagesByTerritory[img.territoryNumber][img.imageType] = img.filePath;
-    });    // Ajouter les URLs des images aux territoires
-    territories.forEach(territory => {
+    });
+
+    allLayers.forEach(layer => {
+      if (!layersByTerritory[layer.territoryNumber]) {
+        layersByTerritory[layer.territoryNumber] = {
+          paintLayersImage: [],
+          paintLayersLarge: []
+        };
+      }      // Convertir le layer de la base de données vers le format PaintLayer
+      const paintLayer = {
+        id: layer.id,
+        visible: layer.visible,
+        locked: layer.locked,
+        style: JSON.parse(layer.style),
+        timestamp: layer.createdAt ? new Date(layer.createdAt).getTime() : Date.now(),
+        type: layer.layerType,
+        data: JSON.parse(layer.layerData)
+      };
+
+      if (layer.imageType === 'standard') {
+        layersByTerritory[layer.territoryNumber].paintLayersImage.push(paintLayer);
+      } else if (layer.imageType === 'large') {
+        layersByTerritory[layer.territoryNumber].paintLayersLarge.push(paintLayer);
+      }
+    });
+
+    // Ajouter les URLs des images et les layers aux territoires
+    territories.forEach((territory: any) => {
       const territoryImages = imagesByTerritory[territory.num];
+      const territoryLayers = layersByTerritory[territory.num];
 
       if (territoryImages) {
         // Ajouter les URLs avec le préfixe complet pour le serveur statique
@@ -190,7 +245,7 @@ export const getReconstructedTerritories = async (userId: string) => {
         if (territoryImages['standard']) {
           territory.image = `${FRONTEND_URL}/api/p${territoryImages['standard']}`;
         }
-        
+
         // Image originale standard
         if (territoryImages['original']) {
           territory.original = `${FRONTEND_URL}/api/p${territoryImages['original']}`;
@@ -203,7 +258,7 @@ export const getReconstructedTerritories = async (userId: string) => {
         if (territoryImages['large']) {
           territory.large = `${FRONTEND_URL}/api/p${territoryImages['large']}`;
         }
-        
+
         // Image originale large
         if (territoryImages['originalLarge']) {
           territory.originalLarge = `${FRONTEND_URL}/api/p${territoryImages['originalLarge']}`;
@@ -222,8 +277,189 @@ export const getReconstructedTerritories = async (userId: string) => {
           territory.isDefault = false
         }
       }
+
+      // Ajouter les layers de peinture au territoire
+      if (territoryLayers) {
+        territory.paintLayersImage = territoryLayers.paintLayersImage;
+        territory.paintLayersLarge = territoryLayers.paintLayersLarge;
+      } else {
+        // Initialiser des tableaux vides si aucun layer n'existe
+        territory.paintLayersImage = [];
+        territory.paintLayersLarge = [];
+      }
     })
   }
 
   return territories
+}
+
+// Layers de territoires
+export const createTerritoryLayer = async (data: {
+  userId: string
+  territoryNumber: string
+  imageType: 'standard' | 'large'
+  layerType: 'brush' | 'line' | 'arrow' | 'circle' | 'rectangle' | 'text' | 'parking' | 'compass'
+  layerData: string
+  style: string
+  visible?: boolean
+  locked?: boolean
+}) => {
+  const id = nanoid()
+
+  const [result] = await db.insert(territoryLayers).values({
+    id,
+    userId: data.userId,
+    territoryNumber: data.territoryNumber,
+    imageType: data.imageType,
+    visible: data.visible ?? true,
+    locked: data.locked ?? false,
+    style: data.style,
+    layerType: data.layerType,
+    layerData: data.layerData
+    // createdAt et updatedAt seront automatiquement définis par la base de données
+  })
+
+  return {
+    id,
+    userId: data.userId,
+    territoryNumber: data.territoryNumber,
+    imageType: data.imageType,
+    visible: data.visible ?? true,
+    locked: data.locked ?? false,
+    style: data.style,
+    layerType: data.layerType,
+    layerData: data.layerData
+  }
+}
+
+export const getTerritoryLayersByUser = async (userId: string, territoryNumber?: string, imageType?: string) => {
+  let whereConditions = [eq(territoryLayers.userId, userId)]
+
+  if (territoryNumber) {
+    whereConditions.push(eq(territoryLayers.territoryNumber, territoryNumber))
+  }
+
+  if (imageType) {
+    whereConditions.push(eq(territoryLayers.imageType, imageType))
+  }
+
+  return await db
+    .select()
+    .from(territoryLayers)
+    .where(and(...whereConditions))
+    .orderBy(desc(territoryLayers.createdAt))
+}
+
+export const getTerritoryLayer = async (userId: string, layerId: string) => {
+  const result = await db
+    .select()
+    .from(territoryLayers)
+    .where(and(
+      eq(territoryLayers.userId, userId),
+      eq(territoryLayers.id, layerId)
+    ))
+    .limit(1)
+
+  return result.length > 0 ? result[0] : null
+}
+
+export const updateTerritoryLayer = async (userId: string, layerId: string, updates: {
+  visible?: boolean
+  locked?: boolean
+  style?: string
+  layerData?: string
+}) => {
+  await db
+    .update(territoryLayers)
+    .set({
+      ...updates,
+      updatedAt: new Date()
+    })
+    .where(and(
+      eq(territoryLayers.userId, userId),
+      eq(territoryLayers.id, layerId)
+    ))
+
+  // Vérifier si le layer existe après la mise à jour
+  const layer = await getTerritoryLayer(userId, layerId)
+  return layer !== null
+}
+
+export const deleteTerritoryLayer = async (userId: string, layerId: string) => {
+  // Vérifier si le layer existe avant suppression
+  const layer = await getTerritoryLayer(userId, layerId)
+  if (!layer) {
+    return false
+  }
+
+  await db
+    .delete(territoryLayers)
+    .where(and(
+      eq(territoryLayers.userId, userId),
+      eq(territoryLayers.id, layerId)
+    ))
+
+  return true
+}
+
+export const deleteTerritoryLayersByTerritory = async (userId: string, territoryNumber: string, imageType?: string) => {
+  let whereConditions = [
+    eq(territoryLayers.userId, userId),
+    eq(territoryLayers.territoryNumber, territoryNumber)
+  ]
+
+  if (imageType) {
+    whereConditions.push(eq(territoryLayers.imageType, imageType))
+  }
+
+  // Compter les layers à supprimer
+  const layersToDelete = await db
+    .select()
+    .from(territoryLayers)
+    .where(and(...whereConditions))
+
+  await db
+    .delete(territoryLayers)
+    .where(and(...whereConditions))
+
+  return layersToDelete.length
+}
+
+/**
+ * Sauvegarde plusieurs layers en une fois
+ * Supprime tous les anciens layers du territoire avant d'ajouter les nouveaux
+ */
+export const saveTerritoryLayers = async (
+  userId: string,
+  territoryNumber: string,
+  imageType: 'standard' | 'large',
+  layers: Array<{
+    id?: string
+    type: string
+    visible: boolean
+    locked: boolean
+    style: any
+    data: any
+  }>
+) => {
+  // Supprimer tous les anciens layers de ce territoire et type d'image
+  await deleteTerritoryLayersByTerritory(userId, territoryNumber, imageType)
+
+  // Ajouter les nouveaux layers
+  const savedLayers = []
+  for (const layer of layers) {
+    const savedLayer = await createTerritoryLayer({
+      userId,
+      territoryNumber,
+      imageType,
+      layerType: layer.type as 'brush' | 'line' | 'arrow' | 'circle' | 'rectangle' | 'text' | 'parking' | 'compass',
+      layerData: JSON.stringify(layer.data),
+      style: JSON.stringify(layer.style),
+      visible: layer.visible,
+      locked: layer.locked
+    })
+    savedLayers.push(savedLayer)
+  }
+
+  return savedLayers
 }

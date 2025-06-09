@@ -5,15 +5,19 @@ import { useTranslation } from 'react-i18next'
 import LanguageSelector from '../LanguageSelector'
 import ThemeSelector from '../ThemeSelector'
 import { useApiTerritory } from '&/useApiTerritory'
+import { useUser } from '&/useUser'
 const SideNav: FC = () => {
   const { t } = useTranslation()
   const { cache } = useApiTerritory()
+  const { user } = useUser()
 
   const hasTerritoriesInCache = cache?.territories && cache.territories.length > 0
+  const isLoggedIn = !!user
+
   const links = [
-    { label: t('c.ux.nav.home'), icon: Home, href: '/' },
-    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.allTerritories', 'Mes territoires'), icon: Map, href: '/territories' }] : []),
-    ...(hasTerritoriesInCache ? [{ label: t('c.ux.nav.exportation', 'Exportation'), icon: Download, href: '/exportation' }] : []),
+    ...(isLoggedIn ? [{ label: t('c.ux.nav.home'), icon: Home, href: '/' }] : []),
+    ...(isLoggedIn && hasTerritoriesInCache ? [{ label: t('c.ux.nav.allTerritories', 'Mes territoires'), icon: Map, href: '/territories' }] : []),
+    ...(isLoggedIn && hasTerritoriesInCache ? [{ label: t('c.ux.nav.exportation', 'Exportation'), icon: Download, href: '/exportation' }] : []),
     { label: t('c.ux.nav.configuration', 'Configuration'), icon: Settings, href: '/configuration' }
   ]
 

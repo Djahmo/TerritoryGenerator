@@ -2,14 +2,16 @@ import Fastify from 'fastify'
 import { registerAuthRoutes } from './routes/auth.js'
 import { registerTerritoryRoutes } from './routes/territories.js'
 import { registerUserConfigRoutes } from './routes/userConfig.js'
-import { registerTerritoryLayersRoutes } from './routes/territoryLayers.js'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import env from './env.js'
 import fastifyStatic from '@fastify/static'
 import fastifyMultipart from '@fastify/multipart'
 
-const app = Fastify()
+const app = Fastify({
+  // Augmenter la limite du body pour les requêtes JSON (50MB)
+  bodyLimit: 50 * 1024 * 1024
+})
 
 await app.register(cookie)
 await app.register(cors, {
@@ -33,7 +35,6 @@ app.get('/ping', async () => ({ pong: true }))
 registerAuthRoutes(app)
 registerTerritoryRoutes(app)
 registerUserConfigRoutes(app)
-registerTerritoryLayersRoutes(app)
 
 app.listen({ port: env.API_PORT }, () => {
   console.log(`API server running at http://localhost:${env.API_PORT}`)

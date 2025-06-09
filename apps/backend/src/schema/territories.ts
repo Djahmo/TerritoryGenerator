@@ -25,8 +25,7 @@ export const territoryLayers = mysqlTable('territory_layers', {
   territoryNumber: varchar('territoryNumber', { length: 50 }).notNull(),
   imageType: varchar('imageType', { length: 20 }).notNull(), // Type d'image associé ('standard' ou 'large')
   visible: boolean('visible').notNull().default(true),
-  locked: boolean('locked').notNull().default(false),
-  style: text('style').notNull(), // Style JSON (couleur, épaisseur, etc.)
+  locked: boolean('locked').notNull().default(false),  style: text('style').notNull(), // Style JSON (couleur, épaisseur, etc.)
   layerType: varchar('layerType', { length: 20 }).notNull(), // 'brush', 'line', 'arrow', 'circle', 'rectangle', 'text', 'parking', 'compass'
   layerData: text('layerData').notNull(), // Données de la couche en JSON
   createdAt: timestamp('createdAt').default(sql`CURRENT_TIMESTAMP`),
