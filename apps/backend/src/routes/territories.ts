@@ -343,32 +343,32 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       })      // Si on a des données de crop, on doit calculer le nouveau bbox à partir de l'image existante
       let finalBbox = customBbox
       console.log('📦 CustomBbox reçu du frontend:', customBbox)
-      
+
       if (cropData) {
         console.log('✂️ CropData reçu:', cropData)
         // Récupérer l'image originalLarge existante pour connaître son bbox
         const existingImage = await getTerritoryImage(userId, territory.num, 'originalLarge')
         console.log('🔍 Image originalLarge trouvée:', existingImage.length > 0 ? 'OUI' : 'NON')
-        
+
         if (existingImage.length > 0 && existingImage[0].bbox) {
           const currentBbox = JSON.parse(existingImage[0].bbox) as [number, number, number, number]
           console.log('📍 Bbox actuel de l\'image originalLarge:', currentBbox)
-          
+
           // Calculer le nouveau bbox en fonction du crop (en %)
           // currentBbox format: [minLon, minLat, maxLon, maxLat]
           const [minLon, minLat, maxLon, maxLat] = currentBbox
           const bboxWidth = maxLon - minLon
           const bboxHeight = maxLat - minLat
-          
+
           console.log('📏 Dimensions du bbox actuel:', { bboxWidth, bboxHeight })
             // Convertir les coordonnées de crop (déjà en décimal 0-1) en coordonnées GPS
-          // IMPORTANT: cropData.y est inversé car les coordonnées Y d'image (0 en haut) 
+          // IMPORTANT: cropData.y est inversé car les coordonnées Y d'image (0 en haut)
           // sont inversées par rapport aux coordonnées GPS (latitude croissante vers le nord)
           const newMinLon = minLon + cropData.x * bboxWidth
           const newMaxLon = minLon + (cropData.x + cropData.width) * bboxWidth
           const newMaxLat = maxLat - cropData.y * bboxHeight  // Inversé !
           const newMinLat = maxLat - (cropData.y + cropData.height) * bboxHeight  // Inversé !
-          
+
           finalBbox = [newMinLon, newMinLat, newMaxLon, newMaxLat]
           console.log('📍 Nouveau bbox calculé pour crop:', {
             cropData,
@@ -754,7 +754,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
       if (images.miniature) {
         imagePromises.push((async () => {          console.log(`🖼️ Sauvegarde de la miniature pour le territoire ${territoryNumber}`)
-          
+
           // Vérifier si c'est une URL ou des données base64
           const miniaturePrefix = images.miniature!.substring(0, 50)
           console.log(`🔍 Format de miniature détecté pour ${territoryNumber}:`, miniaturePrefix)
@@ -934,7 +934,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
       // Sauvegarder UNIQUEMENT l'image standard et la miniature
       const imagePromises: any[] = [];
-      
+
       if (images.image) {
         imagePromises.push(
           (async () => {
@@ -1021,7 +1021,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     }
   })
 
-  // Route pour sauvegarder UNIQUEMENT les données large d'un territoire  
+  // Route pour sauvegarder UNIQUEMENT les données large d'un territoire
   app.put('/territories/:territoryNumber/large', async (request, reply) => {
     const user = await getAuthUser(request)
     if (!user) {

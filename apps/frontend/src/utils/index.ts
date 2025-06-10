@@ -14,7 +14,7 @@ export const capitalize = (str: string) =>
  */
 export const addImageTimestamp = (imageUrl: string): string => {
   if (!imageUrl || imageUrl.trim() === '') return imageUrl;
-  
+
   const separator = imageUrl.includes('?') ? '&' : '?';
   return `${imageUrl}${separator}t=${Date.now()}`;
 };

@@ -134,7 +134,7 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
       if (isLarge) {
         // Mise à jour locale + sauvegarde explicite LARGE
         console.log(`💾 Sauvegarde EXPLICITE en mode LARGE - ${layers.length} layers`);
-        
+
         updateTerritory(num!, {
           paintLayersLarge: layers,
           large: compositeImage, // Image composite avec annotations
@@ -145,9 +145,9 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
       } else {
         // Mise à jour locale + sauvegarde explicite STANDARD
         console.log(`💾 Sauvegarde EXPLICITE en mode STANDARD - ${layers.length} layers`);
-        
+
         const miniature = await generateThumbnailFromImage(compositeImage);
-        
+
         updateTerritory(num!, {
           paintLayersImage: layers,
           image: compositeImage, // Image avec annotations
@@ -322,8 +322,8 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
                 )}
               </svg>
               <span>
-                {isLarge && !territory.originalLarge 
-                  ? 'Générer plan large' 
+                {isLarge && !territory.originalLarge
+                  ? 'Générer plan large'
                   : `Régénérer ${isLarge ? "le plan large" : "l'image"}`
                 }
               </span>
@@ -353,7 +353,7 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
             territoryPolygon={territory?.polygon}
             territory={territory}
             />
-          
+
           {/* Message informatif quand l'image large n'existe pas */}
           {isLarge && !territory.originalLarge && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">

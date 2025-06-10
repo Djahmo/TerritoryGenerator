@@ -129,7 +129,7 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
       lastUpdate: Date.now()
     };    set({ cache: newCache });
 
-    // PLUS DE SAUVEGARDE AUTOMATIQUE ! 
+    // PLUS DE SAUVEGARDE AUTOMATIQUE !
     // La sauvegarde doit être explicite via le bouton "Sauvegarder"
     console.log(`📝 Territoire ${num} mis à jour localement (pas de sauvegarde auto)`);
   },
