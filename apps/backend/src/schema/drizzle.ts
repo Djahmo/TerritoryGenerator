@@ -28,14 +28,12 @@ export const sessions = mysqlTable('sessions', {
   createdAt: datetime('createdAt').default(sql`CURRENT_TIMESTAMP`),
 })
 
-export const territoryImages = mysqlTable('territory_images', {
+export const images = mysqlTable('images', {
   id: varchar('id', { length: 21 }).primaryKey(),
   userId: varchar('userId', { length: 21 }).notNull().references(() => users.id),
   territoryNumber: varchar('territoryNumber', { length: 50 }).notNull(),
   imageType: varchar('imageType', { length: 20 }).notNull(), // 'standard', 'original', 'large', 'originalLarge', 'miniature'
   fileName: varchar('fileName', { length: 255 }).notNull(),
-  filePath: varchar('filePath', { length: 500 }).notNull(),
-  fileSize: int('fileSize').notNull(),
   width: int('width'),
   height: int('height'),
   bbox: text('bbox'), // JSON: [minLon, minLat, maxLon, maxLat]
@@ -45,21 +43,22 @@ export const territoryImages = mysqlTable('territory_images', {
   updatedAt: timestamp('updatedAt').default(sql`CURRENT_TIMESTAMP`).onUpdateNow()
 })
 
-export const territoryLayers = mysqlTable('territory_layers', {
+export const layers = mysqlTable('layers', {
   id: varchar('id', { length: 21 }).primaryKey(),
   userId: varchar('userId', { length: 21 }).notNull().references(() => users.id),
   territoryNumber: varchar('territoryNumber', { length: 50 }).notNull(),
   imageType: varchar('imageType', { length: 20 }).notNull(), // Type d'image associé ('standard' ou 'large')
   visible: boolean('visible').notNull().default(true),
   locked: boolean('locked').notNull().default(false),
-  name: varchar('name', { length: 100 }),  style: text('style').notNull(), // Style JSON (couleur, épaisseur, etc.)
+  name: varchar('name', { length: 100 }),
+  style: text('style').notNull(), // Style JSON (couleur, épaisseur, etc.)
   layerType: varchar('layerType', { length: 20 }).notNull(), // 'brush', 'line', 'arrow', 'circle', 'rectangle', 'text', 'parking', 'compass'
   layerData: text('layerData').notNull(), // Données de la couche en JSON
   createdAt: timestamp('createdAt').default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp('updatedAt').default(sql`CURRENT_TIMESTAMP`).onUpdateNow()
 })
 
-export const territoryData = mysqlTable('territory_data', {
+export const territories = mysqlTable('territories', {
   userId: varchar('userId', { length: 21 }).primaryKey().references(() => users.id),
   data: text('data').notNull(), // Contient les données GPX
   createdAt: timestamp('createdAt').default(sql`CURRENT_TIMESTAMP`),

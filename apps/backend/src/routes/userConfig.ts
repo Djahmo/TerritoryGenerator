@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { getUserConfig, updateUserConfig, resetUserConfig } from '../db/userConfig/index.js'
+import { getUserConfig, updateUserConfig, resetUserConfig } from '../db/index.js'
 import getAuthUser from '../lib/secure/auth.js'
 
 // Schéma de validation pour la mise à jour de la configuration

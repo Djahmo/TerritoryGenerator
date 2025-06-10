@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { FC, useState } from "react"
 import { Check } from "lucide-react"
 import { Link } from "react-router"
+import { addImageTimestamp } from "@/utils"
 
 type MapCardProps = {
   territory: Territory
@@ -50,9 +51,8 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
             <Check size={18} strokeWidth={3} />
           </button>
         </div>
-      )}      <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">
-        <img
-          src={miniature}
+      )}      <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">        <img
+          src={addImageTimestamp(miniature)}
           alt={`Territoire ${num}`}
           className={`object-contain w-full h-full transition-opacity duration-300 `}
         />

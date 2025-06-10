@@ -8,6 +8,7 @@ import { Download, FileArchive, Printer, Eye, Search } from 'lucide-react'
 import Wrapper from '@/components/ui/Wrapper'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
+import { addImageTimestamp } from '@/utils'
 
 // Template de base pour le territoire (HTML sans container)
 const createTerritoryHTML = (territory: Territory): string => {
@@ -296,9 +297,8 @@ const PrintPreviewModal: React.FC<{ territory: Territory; onClose: () => void; }
               <div className="font-bold text-2xl text-black p-2">N°{territory.num}</div>
             </div>
           </div>          {/* Image du territoire - mode fill pour correspondre au print */}
-          <div className="flex-1 overflow-hidden">
-            <img
-              src={activeTab === 'normal' ? territory.image : (territory.large || territory.image)}
+          <div className="flex-1 overflow-hidden">            <img
+              src={addImageTimestamp((activeTab === 'normal' ? territory.image : (territory.large || territory.image)) || '')}
               alt={`Territoire ${territory.num}`}
               className="w-full h-full object-fill"
               onLoad={activeTab === 'normal' ? handleImageLoad : handleImageLoadLarge}
@@ -405,12 +405,11 @@ const Exportation: React.FC = () => {
           setTimeout(() => {
             printWindow.print()
             printWindow.close()
-          }, 500)
-        }
+          }, 500)        }
       }
     }
 
-    tempImg.src = territory.image!
+    tempImg.src = addImageTimestamp(territory.image!)
   }// Fonction pour imprimer la version large d'un territoire
   const printTerritoryLarge = (territory: Territory) => {
     if (!territory.large) {
@@ -477,7 +476,7 @@ const Exportation: React.FC = () => {
         }
       }
     }
-    tempImg.src = territory.large!
+    tempImg.src = addImageTimestamp(territory.large!)
   }
 
   // Fonction pour imprimer tous les territoires en un seul document
@@ -497,10 +496,10 @@ const Exportation: React.FC = () => {
               // En cas d'erreur, utiliser portrait par défaut
               resolve({ territory, isLandscape: false })
             }
-            tempImg.src = territory.image!
+            tempImg.src = addImageTimestamp(territory.image!)
           })
         })
-      )      // Étape 2: Créer le contenu des territoires (le CSS gère automatiquement les sauts de page)
+      )// Étape 2: Créer le contenu des territoires (le CSS gère automatiquement les sauts de page)
       const territoriesContent = territoriesWithOrientation.map(({ territory }: { territory: Territory, isLandscape: boolean }) => {
         return /*html*/`<div class="territory-page">
           <div class="print-container">${createTerritoryHTML(territory)}</div>
@@ -895,9 +894,8 @@ Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleT
                   <div key={territory.num} className="bg-lightnd dark:bg-darknd rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <Link to={`/territory/${territory.num}`} className="flex items-center gap-4">
-                          <img
-                            src={territory.miniature}
+                        <Link to={`/territory/${territory.num}`} className="flex items-center gap-4">                          <img
+                            src={addImageTimestamp(territory.miniature || '')}
                             alt={`Territoire ${territory.num}`}
                             className="w-16 h-16 object-cover rounded border"
                           />

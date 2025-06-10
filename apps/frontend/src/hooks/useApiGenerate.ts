@@ -9,28 +9,50 @@ export const useApiGenerate = () => {
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Service API pour les territoires
-  const apiService = new ApiTerritoryService()
-  // Fonction principale de génération d'images via API
+  const apiService = new ApiTerritoryService()  // Fonction principale de génération d'images via API
   const generateImages = useCallback(async (
     territories: Territory[],
-    callback: (territories: Territory[]) => void
+    callback: (territories: Territory[]) => void,
+    existingTerritories?: Territory[]
   ) => {
     setLoading(true)
     setError(null)
-    setProgress({ current: 0, total: territories.length })
+
+    // Si on a des territoires existants, faire un diff pour ne traiter que les nouveaux
+    let territoriesToGenerate = territories;
+    if (existingTerritories && existingTerritories.length > 0) {
+      const existingNums = new Set(existingTerritories.map(t => t.num));
+      territoriesToGenerate = territories.filter(t => !existingNums.has(t.num));
+
+      console.log(`📊 Diff des territoires:`, {
+        total: territories.length,
+        existants: existingTerritories.length,
+        nouveaux: territoriesToGenerate.length,
+        nouveauxNums: territoriesToGenerate.map(t => t.num)
+      });
+    }
+
+    // Si aucun nouveau territoire, on évite la génération
+    if (territoriesToGenerate.length === 0) {
+      console.log('✅ Aucun nouveau territoire à générer');
+      setLoading(false);
+      return;
+    }
+
+    setProgress({ current: 0, total: territoriesToGenerate.length })
 
     // Créer un nouveau AbortController pour cette génération
     abortControllerRef.current = new AbortController()
 
     try {
-      // Initialisation des territoires
+      // Initialisation des territoires (tous, pas seulement les nouveaux)
       const initialTerritories: Territory[] = [...territories]
       callback([...initialTerritories])
 
       // Compteur pour suivre les images terminées
       let completedCount = 0
 
-      const promises = territories.map((territory, index) =>
+      const promises = territoriesToGenerate.map((territory, index) =>
         new Promise<void>((resolve) => {
           const timeoutId = setTimeout(async () => {
             try {
@@ -39,6 +61,8 @@ export const useApiGenerate = () => {
                 resolve()
                 return
               }
+
+              console.log(`🖼️ Génération de l'image pour le territoire ${territory.num}...`);
               await apiService.generateStandardImage(territory)
 
               if (abortControllerRef.current?.signal.aborted) {
@@ -47,13 +71,13 @@ export const useApiGenerate = () => {
               }
 
               completedCount++
-              setProgress({ current: completedCount, total: territories.length })
+              setProgress({ current: completedCount, total: territoriesToGenerate.length })
 
               callback([...initialTerritories])
             } catch (error) {
               console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
               completedCount++
-              setProgress({ current: completedCount, total: territories.length })            } finally {
+              setProgress({ current: completedCount, total: territoriesToGenerate.length })            } finally {
               resolve()
             }
           }, index * 1000) // Délai de 1 seconde entre chaque requête pour éviter la surcharge de l'API WMS

@@ -7,6 +7,18 @@ import { supportedLanguages } from 'µ/i18n'
 export const capitalize = (str: string) =>
   str.charAt(0).toUpperCase() + str.slice(1)
 
+/**
+ * Ajoute un timestamp à une URL d'image pour forcer le navigateur à recharger la dernière version
+ * @param imageUrl - L'URL de l'image
+ * @returns L'URL avec un timestamp ajouté
+ */
+export const addImageTimestamp = (imageUrl: string): string => {
+  if (!imageUrl || imageUrl.trim() === '') return imageUrl;
+  
+  const separator = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${separator}t=${Date.now()}`;
+};
+
 export const baseURL = '/api'
 
 export const sendApi = (url: string, method = 'GET', options: any = {}, credentials?: boolean): Promise<string | Blob | object | null> => send(baseURL + url, method, options, credentials)

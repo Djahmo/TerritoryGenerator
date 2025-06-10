@@ -6,15 +6,15 @@ export class CompassTool {  static draw(ctx: CanvasRenderingContext2D, compass: 
     const x = compass.x;
     const y = compass.y;
     const rotation = compass.rotation || 0;
-    
+
     withCanvasContext(ctx, (ctx) => {
       // Translation au centre de la boussole
       ctx.translate(x, y);
-      
+
       // Appliquer la rotation
       // La rotation est déjà correctement ajustée pour tenir compte du retournement d'image
       ctx.rotate(rotation);
-      
+
       // Cercle extérieur
       ctx.beginPath();
       ctx.arc(0, 0, size / 2, 0, 2 * Math.PI);
@@ -69,19 +69,14 @@ export class CompassTool {  static draw(ctx: CanvasRenderingContext2D, compass: 
     });
   }  static createNew(color: string, position: Point, rotation?: number): DrawCompass {
     // Normaliser l'angle entre -Pi et Pi si fourni
-    let normalizedRotation = rotation || 0;
-    
-    // Ajouter un décalage supplémentaire de -5 degrés pour une orientation plus précise
-    const fineAdjustment = -5 * (Math.PI / 180);
-    normalizedRotation += fineAdjustment;
-    
-    while (normalizedRotation > Math.PI) {
-      normalizedRotation -= 2 * Math.PI;
+    let normalizedRotation
+    if (rotation !== undefined && rotation !== null) {
+      normalizedRotation = -rotation;
     }
-    while (normalizedRotation < -Math.PI) {
-      normalizedRotation += 2 * Math.PI;
+    else {
+      normalizedRotation = 0;
     }
-    
+
     return {
       type: 'compass',
       rotation: normalizedRotation,
@@ -92,18 +87,15 @@ export class CompassTool {  static draw(ctx: CanvasRenderingContext2D, compass: 
   static updatePosition(compass: DrawCompass, position: Point): DrawCompass {
     return updatePositionBase(compass, position);
   }  static updateRotation(compass: DrawCompass, rotation: number): DrawCompass {
-    // Ajouter un décalage supplémentaire de -5 degrés pour une orientation plus précise
-    const fineAdjustment = -5 * (Math.PI / 180);
-    let normalizedRotation = rotation + fineAdjustment;
-    
     // Normaliser l'angle entre -Pi et Pi
-    while (normalizedRotation > Math.PI) {
-      normalizedRotation -= 2 * Math.PI;
+    let normalizedRotation = rotation;
+
+    if (rotation !== undefined && rotation !== null) {
+      normalizedRotation = -rotation;
     }
-    while (normalizedRotation < -Math.PI) {
-      normalizedRotation += 2 * Math.PI;
+    else {
+      normalizedRotation = 0;
     }
-    
     return {
       ...compass,
       rotation: normalizedRotation

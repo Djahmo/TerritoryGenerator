@@ -249,4 +249,75 @@ export class ApiTerritoryService {
 
     return { success: true }
   }
+
+  /**
+   * Sauvegarde UNIQUEMENT les données standard d'un territoire
+   */
+  async saveTerritoryStandard(territory: Territory): Promise<{ success: boolean }> {
+    const response = await fetch(`${this.baseUrl}/territories/${territory.num}/standard`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        territory: {
+          num: territory.num,
+          name: territory.name,
+          polygon: territory.polygon,
+          rotation: territory.rotation,
+          currentBboxLarge: territory.currentBboxLarge
+        },
+        images: {
+          image: territory.image,
+          miniature: territory.miniature
+        },
+        layers: {
+          paintLayersImage: territory.paintLayersImage || []
+        }
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Erreur HTTP ${response.status}`)
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Sauvegarde UNIQUEMENT les données large d'un territoire
+   */
+  async saveTerritoryLarge(territory: Territory): Promise<{ success: boolean }> {
+    const response = await fetch(`${this.baseUrl}/territories/${territory.num}/large`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        territory: {
+          num: territory.num,
+          name: territory.name,
+          polygon: territory.polygon,
+          rotation: territory.rotation,
+          currentBboxLarge: territory.currentBboxLarge
+        },
+        images: {
+          large: territory.large
+        },
+        layers: {
+          paintLayersLarge: territory.paintLayersLarge || []
+        }
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Erreur HTTP ${response.status}`)
+    }
+
+    return { success: true }
+  }
 }

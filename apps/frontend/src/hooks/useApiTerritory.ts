@@ -14,8 +14,9 @@ type State = {
   setCache: (cache: TerritoryCache | null) => void;
   updateTerritories: (territories: Territory[]) => void;
   updateGpx: (gpx: string) => void;
-  updateTerritoryLayers: (num: string, layers: PaintLayer[], isLarge?: boolean) => void;
-  updateTerritory: (num: string, updates: Partial<Territory>) => void;
+  updateTerritoryLayers: (num: string, layers: PaintLayer[], isLarge?: boolean) => void;  updateTerritory: (num: string, updates: Partial<Territory>) => void;
+  saveTerritoryStandard: (num: string) => Promise<void>;
+  saveTerritoryLarge: (num: string) => Promise<void>;
   clearCache: () => void;
   initialize: () => Promise<void>;
   saveToBackend: () => Promise<void>;
@@ -126,31 +127,83 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
       ...prev,
       territories: updatedTerritories,
       lastUpdate: Date.now()
-    };
+    };    set({ cache: newCache });
 
-    set({ cache: newCache });
+    // PLUS DE SAUVEGARDE AUTOMATIQUE ! 
+    // La sauvegarde doit être explicite via le bouton "Sauvegarder"
+    console.log(`📝 Territoire ${num} mis à jour localement (pas de sauvegarde auto)`);
+  },
 
-    // Déterminer le territoire mis à jour
-    const updatedTerritory = updatedTerritories.find(t => t.num === num);
-      // Si des couches de peinture sont mises à jour ou le territoire contient des couches, utiliser l'API complète
-    const hasLayers = processedUpdates.paintLayersImage ||
-                     processedUpdates.paintLayersLarge ||
-                     (updatedTerritory && ((updatedTerritory.paintLayersImage && updatedTerritory.paintLayersImage.length > 0) ||
-                                          (updatedTerritory.paintLayersLarge && updatedTerritory.paintLayersLarge.length > 0)));
+  saveTerritoryStandard: async (num: string) => {
+    const cache = get().cache;
+    if (!cache) {
+      console.error('❌ saveTerritoryStandard: Pas de cache disponible');
+      return;
+    }
 
-    if (hasLayers && updatedTerritory) {
-      try {
-        console.log(`🎨 Sauvegarde complète du territoire ${num} avec couches de peinture`);
-        await apiService.updateTerritoryComplete(updatedTerritory);
-        console.log(`✅ Territoire ${num} sauvegardé avec succès`);
-      } catch (error) {
-        console.error(`❌ Erreur lors de la sauvegarde complète du territoire ${num}:`, error);
-      }
-    } else {
-      // Sauvegarder automatiquement en backend si on a des territoires complets
-      if (updatedTerritories.some(t => t.image || t.large)) {
-        get().saveToBackend().catch(console.error);
-      }
+    const territory = cache.territories.find(t => t.num === num);
+    if (!territory) {
+      console.error(`❌ saveTerritoryStandard: Territoire ${num} non trouvé`);
+      return;
+    }
+
+    try {
+      console.log(`💾 Sauvegarde STANDARD explicite du territoire ${num}`);
+        // Créer l'objet avec uniquement les données standard
+      const territoryToSave = {
+        ...territory,
+        // Assurer que les données sont cohérentes
+        image: territory.image || territory.original,
+        original: territory.original || territory.image,
+        // Ne sauvegarder que les layers standard
+        paintLayersImage: territory.paintLayersImage || [],
+        // Exclure les données large pour éviter la corruption
+        large: undefined,
+        originalLarge: undefined,
+        paintLayersLarge: undefined      };
+
+      await apiService.saveTerritoryStandard(territoryToSave);
+      console.log(`✅ Territoire ${num} (standard) sauvegardé avec succès`);
+    } catch (error) {
+      console.error(`❌ Erreur lors de la sauvegarde standard du territoire ${num}:`, error);
+      throw error;
+    }
+  },
+
+  saveTerritoryLarge: async (num: string) => {
+    const cache = get().cache;
+    if (!cache) {
+      console.error('❌ saveTerritoryLarge: Pas de cache disponible');
+      return;
+    }
+
+    const territory = cache.territories.find(t => t.num === num);
+    if (!territory) {
+      console.error(`❌ saveTerritoryLarge: Territoire ${num} non trouvé`);
+      return;
+    }
+
+    try {
+      console.log(`💾 Sauvegarde LARGE explicite du territoire ${num}`);
+        // Créer l'objet avec uniquement les données large
+      const territoryToSave = {
+        ...territory,
+        // Assurer que les données sont cohérentes
+        large: territory.large || territory.originalLarge,
+        originalLarge: territory.originalLarge || territory.large,
+        // Ne sauvegarder que les layers large
+        paintLayersLarge: territory.paintLayersLarge || [],
+        // Exclure les données standard pour éviter la corruption
+        image: undefined,
+        original: undefined,
+        miniature: undefined,
+        paintLayersImage: undefined      };
+
+      await apiService.saveTerritoryLarge(territoryToSave);
+      console.log(`✅ Territoire ${num} (large) sauvegardé avec succès`);
+    } catch (error) {
+      console.error(`❌ Erreur lors de la sauvegarde large du territoire ${num}:`, error);
+      throw error;
     }
   },
 
@@ -248,6 +301,8 @@ export const useApiTerritory = () => {
     updateGpx,
     updateTerritoryLayers,
     updateTerritory,
+    saveTerritoryStandard,
+    saveTerritoryLarge,
     clearCache,
     initialize,
     saveToBackend,
@@ -257,7 +312,6 @@ export const useApiTerritory = () => {
   useEffect(() => {
     if (loading) initialize();
   }, [loading, initialize]);
-
   return {
     cache,
     loading,
@@ -266,6 +320,8 @@ export const useApiTerritory = () => {
     updateGpx,
     updateTerritoryLayers,
     updateTerritory,
+    saveTerritoryStandard,
+    saveTerritoryLarge,
     clearCache,
     saveToBackend,
     loadFromBackend

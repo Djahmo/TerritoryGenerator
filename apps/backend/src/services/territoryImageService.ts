@@ -180,11 +180,10 @@ export class TerritoryImageService {
 
   /**
    * Génère une image large (sans optimisation d'orientation)
-   */
-  async generateLargeImage(
+   */  async generateLargeImage(
     territory: Territory,
     options: ImageGenerationConfig = {}
-  ): Promise<{ dataUrl: string, width: number, height: number }> {
+  ): Promise<{ dataUrl: string, width: number, height: number, bbox: [number, number, number, number] }> {
     const { contourColor, contourWidth } = {
       contourColor: this.userConfig.contourColor,
       contourWidth: this.userConfig.contourWidth,
@@ -232,9 +231,7 @@ export class TerritoryImageService {
       const xf = (x * finalWidth) / canvas.width
       const yf = (y * finalHeight) / canvas.height
       return [xf, yf] as [number, number]
-    })
-
-    // 6. Ajout du masque et du contour
+    })    // 6. Ajout du masque et du contour
     const finalCtx = finalCanvas.getContext('2d')
     drawMask(finalCtx, finalPolygon, finalWidth, finalHeight, {
       planLarge: true
@@ -244,7 +241,8 @@ export class TerritoryImageService {
     return {
       dataUrl: finalCanvas.toDataURL(),
       width: finalWidth,
-      height: finalHeight
+      height: finalHeight,
+      bbox
     }
   }
   /**

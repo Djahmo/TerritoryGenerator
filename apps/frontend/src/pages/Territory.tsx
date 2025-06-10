@@ -15,7 +15,7 @@ import { ApiTerritoryService } from "@/services/apiTerritoryService"
 
 const Territory = () => {  const { num } = useParams<{ num: string }>()
   const { t } = useTranslation()
-  const { cache, updateTerritories, updateTerritory } = useApiTerritory()
+  const { cache, updateTerritories, updateTerritory, saveTerritoryStandard, saveTerritoryLarge } = useApiTerritory()
   const { generateThumbnailFromImage, generateLargeImage, generateLargeImageWithCrop, generateStandardImage } = useApiGenerate()
   const navigate = useNavigate()
   const territory = cache?.territories?.find((t: any) => t.num === num)
@@ -26,6 +26,13 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false)
   const [paintKey, setPaintKey] = useState<number>(0)
   const [isGeneratingCrop, setIsGeneratingCrop] = useState<boolean>(false)
+  const [imageRefreshTimestamp, setImageRefreshTimestamp] = useState<number>(Date.now())
+  // Fonction pour obtenir l'URL d'une image avec un timestamp de cache
+  const getImageUrlWithTimestamp = (imageUrl: string): string => {
+    if (!imageUrl) return imageUrl;
+    const separator = imageUrl.includes('?') ? '&' : '?';
+    return `${imageUrl}${separator}t=${imageRefreshTimestamp}`;
+  };
 
   const [isVertical, setIsVertical] = useState<boolean>(false)
   useEffect(() => {
@@ -37,58 +44,83 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
   const handleRename = () => {
     const updatedTerritorys = cache?.territories.map((t: any) => t.num === num ? { ...t, name: inputName } : t)
     if (updatedTerritorys) updateTerritories(updatedTerritorys)
-  };
-
-  const handleToggleLarge = async () => {
+  };  const handleToggleLarge = async () => {
     if (!territory) return;
 
-    if (!isLarge && !territory.originalLarge) {
-      setIsGeneratingLarge(true);
-      try {
-        const success = await generateLargeImage(territory);
+    console.log(`🔄 handleToggleLarge appelé - État actuel: isLarge=${isLarge}, territoire=${territory.num}`);
 
-        if (success) {
-          // Récupérer l'URL de l'image
-          const apiService = new ApiTerritoryService();
-          const response = await apiService.getTerritoryImages(territory.num, 'large');
-
-          if (response.images && response.images.length > 0) {
-            const imageUrl = `/p${response.images[0].imageUrl}`;
-
-            // Vérifier si l'image est verticale (hauteur > largeur)
-            const img = new Image();
-            img.onload = () => {
-              setIsVertical(img.height > img.width);
-            };
-            img.src = imageUrl;
-
-            updateTerritory(num!, {
-              originalLarge: imageUrl,
-              large: imageUrl
-            });
-          }
-        }
-      } catch (error) {
-        toast.error(t("p.territory.generate_large_error"));
-        setIsGeneratingLarge(false);
-        return;
-      }
-      setIsGeneratingLarge(false);
-    }
-
-    if (territory.originalLarge) {
+    // Toujours permettre le basculement, même si l'image n'existe pas
+    const newIsLarge = !isLarge;
+    setIsLarge(newIsLarge);
+      if (newIsLarge && territory.originalLarge) {
+      // Si on bascule vers large et que l'image existe, charger l'orientation
       const img = new Image();
       img.onload = () => {
         setIsVertical(img.height > img.width);
+        // Forcer la mise à jour du canvas
+        setPaintKey(prev => prev + 1);
       };
-      img.src = territory.originalLarge;
-      setIsLarge(!isLarge);
+      img.src = getImageUrlWithTimestamp(territory.originalLarge);
+    } else {
+      // Forcer la mise à jour du canvas dans tous les autres cas
+      setPaintKey(prev => prev + 1);
     }
   };
-  const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
+
+  const handleGenerateLarge = async () => {
     if (!territory) return;
 
-    console.log(`🎨 Territory.handleSave - Début de la sauvegarde du territoire ${territory.num}`)
+    console.log(`🚀 Génération d'un nouveau plan large pour territoire ${territory.num}`);
+    setIsGeneratingLarge(true);
+    try {
+      const success = await generateLargeImage(territory);
+
+      if (success) {
+        // Récupérer l'URL de l'image
+        const apiService = new ApiTerritoryService();
+        const response = await apiService.getTerritoryImages(territory.num, 'large');
+
+        if (response.images && response.images.length > 0) {
+          const imageUrl = `/p${response.images[0].imageUrl}`;
+
+          // Vérifier si l'image est verticale (hauteur > largeur)
+          const img = new Image();          img.onload = () => {
+            setIsVertical(img.height > img.width);
+            console.log(`🖼️ Image large chargée pour territoire ${territory.num}`);
+            // Forcer la mise à jour du canvas
+            setImageRefreshTimestamp(Date.now());
+            setPaintKey(prev => prev + 1);
+            // Arrêter l'état de génération APRÈS le chargement
+            setIsGeneratingLarge(false);
+          };
+          img.onerror = () => {
+            console.error("Erreur lors du chargement de l'image large");
+            setIsGeneratingLarge(false);
+          };
+          img.src = getImageUrlWithTimestamp(imageUrl);
+
+          updateTerritory(num!, {
+            originalLarge: imageUrl,
+            large: imageUrl
+          });
+        } else {
+          // Aucune image trouvée dans la réponse
+          console.error("Aucune image large trouvée dans la réponse API");
+          setIsGeneratingLarge(false);
+        }
+      } else {
+        // Échec de la génération
+        console.error("Échec de la génération de l'image large");
+        setIsGeneratingLarge(false);
+      }
+    } catch (error) {
+      toast.error(t("p.territory.generate_large_error"));
+      setIsGeneratingLarge(false);
+    }
+  };  const handleSave = async (layers: PaintLayer[], compositeImage?: string) => {
+    if (!territory) return;
+
+    console.log(`🎨 Territory.handleSave - Début de la sauvegarde EXPLICITE du territoire ${territory.num}`)
     console.log(`📊 Nombre de layers reçus:`, layers.length)
     console.log(`🖼️ Image composite présente:`, !!compositeImage)
     console.log(`📏 Type de vue:`, isLarge ? 'large' : 'standard')
@@ -99,114 +131,57 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
         return;
       }
 
-      let updates: any = {};
-
       if (isLarge) {
-        // Pour le plan large, nous pouvons conserver l'image composite côté client
-        // car elle contient les annotations dessinées par l'utilisateur
-        updates = {
+        // Mise à jour locale + sauvegarde explicite LARGE
+        console.log(`💾 Sauvegarde EXPLICITE en mode LARGE - ${layers.length} layers`);
+        
+        updateTerritory(num!, {
           paintLayersLarge: layers,
-          large: compositeImage, // Nous gardons l'image composite avec les annotations
-          paintLayersImage: territory.paintLayersImage || [],
-          image: territory.image,
-          miniature: territory.miniature
+          large: compositeImage, // Image composite avec annotations
+        });
 
-        };
-        console.log(`🎨 Sauvegarde en mode LARGE - ${layers.length} layers`);
+        // Sauvegarde explicite côté serveur (QUE les données large)
+        await saveTerritoryLarge(num!);
       } else {
+        // Mise à jour locale + sauvegarde explicite STANDARD
+        console.log(`💾 Sauvegarde EXPLICITE en mode STANDARD - ${layers.length} layers`);
+        
         const miniature = await generateThumbnailFromImage(compositeImage);
-        updates = {
+        
+        updateTerritory(num!, {
           paintLayersImage: layers,
           image: compositeImage, // Image avec annotations
           miniature: miniature,  // Miniature générée localement
-          paintLayersLarge: territory.paintLayersLarge || [],
-          large: territory.large,
-          originalLarge: territory.originalLarge
-        };
-        console.log(`🎨 Sauvegarde en mode STANDARD - ${layers.length} layers`);
+        });
+
+        // Sauvegarde explicite côté serveur (QUE les données standard)
+        await saveTerritoryStandard(num!);
       }
 
-      console.log(`📤 Appel de updateTerritory avec:`, {
-        territoryNum: num,
-        layersCount: isLarge ? updates.paintLayersLarge?.length : updates.paintLayersImage?.length
-      });
-
-      updateTerritory(num!, updates);
       toast.success(t("p.territory.save_success"))
     } catch (error) {
-      // En cas d'erreur, nous sauvegardons au moins les couches de peinture
-      if (isLarge) {
-        updateTerritory(num!, { paintLayersLarge: layers })
-      } else {
-        updateTerritory(num!, { paintLayersImage: layers })
-      }
+      console.error('❌ Erreur lors de la sauvegarde explicite:', error);
       toast.error("Erreur lors de la sauvegarde de l'image")
     }
   }
   const handleRegenerate = async () => {
-    if (!territory) return
-
-    setIsRegenerating(true);
+    if (!territory) return    setIsRegenerating(true);
     try {
-      const apiService = new ApiTerritoryService();
-
       if (isLarge) {
-        const success = await generateLargeImage(territory);
-
-        if (success) {
-          // Récupérer l'URL de l'image
-          const response = await apiService.getTerritoryImages(territory.num, 'large');
-
-          if (response.images && response.images.length > 0) {
-            const imageUrl = `/p${response.images[0].imageUrl}`;
-
-            // Vérifier si l'image est verticale (hauteur > largeur)
-            const img = new Image();
-            img.onload = () => {
-              setIsVertical(img.height > img.width);
-            };
-            img.src = imageUrl;
-
-            updateTerritory(num!, {
-              originalLarge: imageUrl,
-              large: imageUrl,
-              paintLayersLarge: [],
-              paintLayersImage: territory.paintLayersImage || [],
-              image: territory.image,
-              miniature: territory.miniature
-            });
-          }
+        const success = await generateLargeImage(territory);        if (success) {
+          // La génération a mis à jour la base de données
+          // Forcer la mise à jour du canvas après régénération
+          setImageRefreshTimestamp(Date.now());
+          setPaintKey(prev => prev + 1);
         }
 
         toast.success(t("p.territory.regenerate_large_success"))
       } else {
-        const success = await generateStandardImage(territory);
-
-        if (success) {
-          // Récupérer l'URL de l'image
-          const response = await apiService.getTerritoryImages(territory.num, 'standard');
-
-          if (response.images && response.images.length > 0) {
-            const imageUrl = `/p${response.images[0].imageUrl}`;
-
-            // Récupérer aussi la miniature
-            const thumbnailResponse = await apiService.getTerritoryImages(territory.num, 'thumbnail');
-            let thumbnailUrl = territory.miniature;
-
-            if (thumbnailResponse.images && thumbnailResponse.images.length > 0) {
-              thumbnailUrl = `/p${thumbnailResponse.images[0].imageUrl}`;
-            }
-
-            updateTerritory(num!, {
-              original: imageUrl,
-              image: imageUrl,
-              miniature: thumbnailUrl,
-              paintLayersImage: [],
-              paintLayersLarge: territory.paintLayersLarge || [],
-              large: territory.large,
-              originalLarge: territory.originalLarge
-            });
-          }
+        const success = await generateStandardImage(territory);        if (success) {
+          // La génération a mis à jour la base de données
+          // Forcer la mise à jour du canvas après régénération
+          setImageRefreshTimestamp(Date.now());
+          setPaintKey(prev => prev + 1);
         }
 
         toast.success(t("p.territory.regenerate_success"))
@@ -233,6 +208,13 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
       return;
     }    setIsGeneratingCrop(true)
     try {
+      // ⚠️ IMPORTANT: Le crop ne fonctionne QUE pour le plan large !
+      // Si l'utilisateur n'est pas en mode large, on force le passage en mode large
+      if (!isLarge) {
+        console.log("🔄 Crop détecté en mode standard - Forçage du mode large");
+        setIsLarge(true);
+      }
+
       // Calculer un bbox valide basé sur le polygone du territoire
       const lats = territory.polygon.map(p => p.lat);
       const lons = territory.polygon.map(p => p.lon);
@@ -255,67 +237,39 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
         centerLat + height/2
       ];
 
-      console.log("Génération d'image avec bbox calculé:", validBbox);
+      console.log("Génération d'image LARGE avec bbox calculé:", validBbox);
       const success = await generateLargeImageWithCrop(territory, validBbox, cropData)
 
       if (success) {
         const apiService = new ApiTerritoryService();
 
-        if (isLarge) {
-          // Récupérer l'URL de l'image
-          const response = await apiService.getTerritoryImages(territory.num, 'large');
+        // Le crop génère TOUJOURS une image large, peu importe le mode initial
+        const response = await apiService.getTerritoryImages(territory.num, 'large');        if (response.images && response.images.length > 0) {
+          const imageUrl = `/p${response.images[0].imageUrl}`;
 
-          if (response.images && response.images.length > 0) {
-            const imageUrl = `/p${response.images[0].imageUrl}`;
-
-            updateTerritory(num!, {
-              originalLarge: imageUrl,
-              large: imageUrl,
-              paintLayersLarge: [],
-              paintLayersImage: territory.paintLayersImage || [],
-              image: territory.image,
-              miniature: territory.miniature
-            });
-          }
-
-          toast.success("Plan large mis à jour avec le crop - contour du territoire redessiné")
-        } else {
-          // Récupérer l'URL de l'image standard
-          const response = await apiService.getTerritoryImages(territory.num, 'standard');
-
-          if (response.images && response.images.length > 0) {
-            const imageUrl = `/p${response.images[0].imageUrl}`;
-
-            // Récupérer aussi la miniature
-            const thumbnailResponse = await apiService.getTerritoryImages(territory.num, 'thumbnail');
-            let thumbnailUrl = territory.miniature;
-
-            if (thumbnailResponse.images && thumbnailResponse.images.length > 0) {
-              thumbnailUrl = `/p${thumbnailResponse.images[0].imageUrl}`;
-            }
-
-            updateTerritory(num!, {
-              original: imageUrl,
-              image: imageUrl,
-              miniature: thumbnailUrl,
-              paintLayersImage: [],
-              paintLayersLarge: territory.paintLayersLarge || [],
-              large: territory.large,
-              originalLarge: territory.originalLarge
-            });
-          }
-
-          toast.success("Image mise à jour avec le crop - contour du territoire redessiné")
-        }
+          updateTerritory(num!, {
+            originalLarge: imageUrl,
+            large: imageUrl,
+            // ⚠️ NE PAS TOUCHER aux layers existants lors d'un crop !
+            // paintLayersLarge: [], // ← SUPPRIMÉ : ça déclenchait /complete !
+            paintLayersImage: territory.paintLayersImage || [],
+            image: territory.image,
+            miniature: territory.miniature
+          });          // Forcer le refresh du canvas APRÈS la mise à jour des données
+          setTimeout(() => {
+            setImageRefreshTimestamp(Date.now());
+            setPaintKey(prev => prev + 1);
+          }, 100);
+        }        toast.success("Plan large mis à jour avec le crop - contour du territoire redessiné")
       }
 
-      setPaintKey(prev => prev + 1)
+      // Le setPaintKey est maintenant dans le if ci-dessus pour être synchronisé
     } catch (error) {
       toast.error("Erreur lors de l'application du crop")
     } finally {
       setIsGeneratingCrop(false)
     }
-  }, [territory, isLarge, generateLargeImageWithCrop, generateThumbnailFromImage, updateTerritory, num])
+  }, [territory, generateLargeImageWithCrop, updateTerritory, num])
 
   if (!territory)
     return (
@@ -332,47 +286,47 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
       <h1 className="text-3xl font-bold flex">
         <span className="border-r pr-2 mr-2 mt-2">{territory.num}</span>
         <Input value={inputName} onChange={(e) => setInputName(e.target.value)} onBlur={handleRename} type="text" placeholder="Nom du territoire" className="mb-0" />
-      </h1>
-
-      {/* Boutons pour contrôler l'affichage et régénérer l'image */}
+      </h1>      {/* Boutons pour contrôler l'affichage et régénérer l'image */}
       <div className="flex gap-3 items-center">
         <button
           onClick={handleToggleLarge}
-          disabled={isGeneratingLarge}
           className={`${isLarge
             ? 'btn-positive'
             : 'btn-neutral'
-            } ${isGeneratingLarge ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >         {isGeneratingLarge ? (
-          <>
-            <div className="animate-spin mr-2">⟳</div>
-            <span>Génération...</span>
-          </>
-        ) : (<div className="flex items-center gap-2 cursor-pointer">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {isLarge ? <path d="M9 9h6v6H9z" /> : <path d="M21 21H3V3h18v18z" />}
-          </svg>
-          <span>{isLarge ? "Plan serré" : "Plan large"}</span>
-        </div>
-        )}
-        </button>
-
-        <button
-          onClick={() => setShowConfirmation(true)}
-          disabled={isRegenerating}
-          className={`btn-warning ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+            }`}
         >
-          {isRegenerating ? (
+          <div className="flex items-center gap-2 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {isLarge ? <path d="M9 9h6v6H9z" /> : <path d="M21 21H3V3h18v18z" />}
+            </svg>
+            <span>{isLarge ? "Plan serré" : "Plan large"}</span>
+          </div>
+        </button>        {/* Bouton de génération/régénération intelligent */}
+        <button
+          onClick={isLarge && !territory.originalLarge ? handleGenerateLarge : () => setShowConfirmation(true)}
+          disabled={isRegenerating || isGeneratingLarge}
+          className={`btn-neutral ${(isRegenerating || isGeneratingLarge) ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {(isRegenerating || isGeneratingLarge) ? (
             <>
               <div className="animate-spin mr-2">⟳</div>
-              <span>Régénération...</span>
+              <span>{isLarge && !territory.originalLarge ? 'Génération...' : 'Régénération...'}</span>
             </>
           ) : (
-            <div className="flex items-center gap-2 cursor-pointer btn-neutral">
+            <div className="flex items-center gap-2 cursor-pointer">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                {isLarge && !territory.originalLarge ? (
+                  <path d="M12 2l3 3-3 3M5 12h14" />
+                ) : (
+                  <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                )}
               </svg>
-              <span>Régénérer {isLarge ? "le plan large" : "l'image"}</span>
+              <span>
+                {isLarge && !territory.originalLarge 
+                  ? 'Générer plan large' 
+                  : `Régénérer ${isLarge ? "le plan large" : "l'image"}`
+                }
+              </span>
             </div>
           )}
         </button>
@@ -389,10 +343,9 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
                 </p>
               </div>
             </div>
-          )}
-          <Paint
+          )}          <Paint
             key={paintKey}
-            src={isLarge ? (territory.originalLarge || territory.original || "") : (territory.original || "")}
+            src={getImageUrlWithTimestamp(isLarge ? (territory.originalLarge || territory.original || "") : (territory.original || ""))}
             layers={isLarge ? (territory.paintLayersLarge || []) : (territory.paintLayersImage || [])}
             onSave={handleSave}
             onCrop={handleApplyCrop}
@@ -400,6 +353,28 @@ const Territory = () => {  const { num } = useParams<{ num: string }>()
             territoryPolygon={territory?.polygon}
             territory={territory}
             />
+          
+          {/* Message informatif quand l'image large n'existe pas */}
+          {isLarge && !territory.originalLarge && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg">
+              <div className="bg-lightnd dark:bg-darknd p-6 rounded-lg shadow-lg text-center max-w-md">
+                <div className="mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-muted">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                    <circle cx="9" cy="9" r="2"/>
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Plan large non disponible</h3>
+                <p className="text-muted text-sm mb-4">
+                  Ce territoire n'a pas encore de plan large généré. Cliquez sur "Générer plan large" pour en créer un.
+                </p>
+                <p className="text-xs text-muted">
+                  Vous pouvez revenir au plan serré à tout moment.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

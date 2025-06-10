@@ -2,7 +2,7 @@
 import { eq, sql } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { db } from '../index.js'
-import { userConfigs, InsertUserConfig, UserConfig } from '../../schema/userConfig.js'
+import { userConfigs, InsertUserConfig, UserConfig } from '../../schema/config.js'
 
 /**
  * Créer ou récupérer la configuration d'un utilisateur

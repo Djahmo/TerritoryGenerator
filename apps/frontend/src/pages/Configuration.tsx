@@ -384,56 +384,6 @@ const Configuration = () => {
           </p>
         </div>
 
-        {/* Configuration réseau */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Configuration réseau</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Nombre de tentatives
-              </label>
-              <Input
-                type="number"
-                value={config.networkRetries.toString()}
-                onChange={(e) => setConfigProperty('networkRetries', parseInt(e.target.value) || 3)}
-                placeholder="Nombre de tentatives"
-                min={1}
-                max={10}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Délai entre tentatives (ms)
-              </label>
-              <Input
-                type="number"
-                value={config.networkDelay.toString()}
-                onChange={(e) => setConfigProperty('networkDelay', parseInt(e.target.value) || 1000)}
-                placeholder="Délai entre tentatives"
-                min={100}
-                max={10000}
-                step={100}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Limite API IGN (ms)
-              </label>
-              <Input
-                type="number"
-                value={config.ignApiRateLimit.toString()}
-                onChange={(e) => setConfigProperty('ignApiRateLimit', parseInt(e.target.value) || 40)}
-                placeholder="Limite API IGN"
-                min={10}
-                max={1000}
-                step={10}
-              />
-            </div>
-          </div>
-        </div>
-
         {/* Configuration API IGN */}
         <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">API IGN</h2>
@@ -449,18 +399,20 @@ const Configuration = () => {
                 placeholder="https://data.geopf.fr/wms-r"
               />
             </div>
-
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="flex flex-row gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Couche
                 </label>
-                <Input
-                  type="text"
-                  value={config.ignApiLayer}
-                  onChange={(e) => setConfigProperty('ignApiLayer', e.target.value)}
-                  placeholder="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"
-                />
+                <Select value={config.ignApiLayer || 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'} onValueChange={(value) => setConfigProperty('ignApiLayer', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2">GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2</SelectItem>
+                    <SelectItem value="ORTHOIMAGERY.ORTHOPHOTOS">ORTHOIMAGERY.ORTHOPHOTOS</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -476,6 +428,7 @@ const Configuration = () => {
                     <SelectItem value="image/jpeg">JPEG</SelectItem>
                     <SelectItem value="image/webp">WebP</SelectItem>
                   </SelectContent>
+
                 </Select>
               </div>
 

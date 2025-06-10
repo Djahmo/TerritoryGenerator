@@ -8,7 +8,6 @@ import {
   getTerritoryImagesByUser,
   getTerritoryImage,
   deleteTerritoryImage,
-  deleteModifiedTerritoryImages,
   saveTerritoryData,
   getTerritoryData,
   getReconstructedTerritories,
@@ -17,14 +16,15 @@ import {
   getTerritoryLayer,
   updateTerritoryLayer,
   deleteTerritoryLayer,
-  deleteTerritoryLayersByTerritory
+  deleteTerritoryLayersByTerritory,
+  getImageFileName,
+  getImageFilePath
 } from '../db/territories/index.js'
 import { getUserConfig } from '../db/userConfig/index.js'
 import getAuthUser from '../lib/secure/auth.js'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { parseCsv, makeGpx } from '../utils/csvParser.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -114,11 +114,11 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     const parse = generateImageSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ errors: parse.error.errors })
-    }
-
-    try {
+    } try {
       const { territory, imageType, options = {} } = parse.data
       const userId = user.id
+
+      console.log(`🎯 Génération d'image demandée - Type: ${imageType}, Territoire: ${territory.num}, User: ${userId}`);
 
       // Récupérer la configuration utilisateur de la base de données
       const userConfig = await getUserConfig(userId)
@@ -177,12 +177,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
         ignApiBaseUrl: userConfig.ignApiBaseUrl,
         ignApiLayer: userConfig.ignApiLayer,
         ignApiFormat: userConfig.ignApiFormat,
-        ignApiCRS: userConfig.ignApiCRS,        networkRetries: userConfig.networkRetries,
+        ignApiCRS: userConfig.ignApiCRS,
+        networkRetries: userConfig.networkRetries,
         networkDelay: userConfig.networkDelay,
         ignApiRateLimit: userConfig.ignApiRateLimit,
         ...options // Les options passées en paramètre prennent le dessus
       }
-
       const imageService = new TerritoryImageService(
         serviceConfig,
         dimensions,
@@ -192,61 +192,38 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
       let imageData: string
       const imageId = nanoid()
-      let fileName: string
       let result: any
 
       if (imageType === 'standard') {
-        // Supprimer les anciennes images standard ET originales pour ce territoire
-        const oldStandardPaths = await deleteTerritoryImage(userId, territory.num, 'standard');
-        const oldOriginalPaths = await deleteTerritoryImage(userId, territory.num, 'original');
-        const oldMiniaturePaths = await deleteTerritoryImage(userId, territory.num, 'miniature');
-
-        // Supprimer les fichiers physiques
-        for (const imagePath of [...oldStandardPaths, ...oldOriginalPaths, ...oldMiniaturePaths]) {
-          await deleteFileIfExists(imagePath);
-        }
-
         result = await imageService.generateStandardImage(territory, options);
         imageData = result.image;
 
         // Créer le dossier utilisateur
         const userDir = path.join(__dirname, '../../public', userId);
-        await fs.mkdir(userDir, { recursive: true });
-
-        const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
-        const imageBuffer = Buffer.from(base64Data, 'base64');
+        await fs.mkdir(userDir, { recursive: true }); const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
 
         // 1. Sauvegarder l'image ORIGINALE (copie de l'image générée)
-        const originalId = nanoid();
-        const originalFileName = `${originalId}.png`;
+        const originalFileName = getImageFileName(territory.num, 'original');
         const originalFilePath = path.join(userDir, originalFileName);
-        await fs.writeFile(originalFilePath, imageBuffer);
+        const originalBuffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(originalFilePath, originalBuffer);
 
         await createTerritoryImage({
           userId,
           territoryNumber: territory.num,
           imageType: 'original',
-          fileName: originalFileName,
-          filePath: `/${userId}/${originalFileName}`,
-          fileSize: imageBuffer.length,
           width: dimensions.finalWidth,
           height: dimensions.finalHeight,
           rotation: territory.rotation
-        });
-
-        // 2. Sauvegarder l'image STANDARD (identique à l'originale pour le moment)
-        const standardId = nanoid();
-        const standardFileName = `${standardId}.png`;
+        });        // 2. Sauvegarder l'image STANDARD (copie du fichier original pour éviter la corruption)
+        const standardFileName = getImageFileName(territory.num, 'standard');
         const standardFilePath = path.join(userDir, standardFileName);
-        await fs.writeFile(standardFilePath, imageBuffer);
+        await fs.copyFile(originalFilePath, standardFilePath);
 
         await createTerritoryImage({
           userId,
           territoryNumber: territory.num,
           imageType: 'standard',
-          fileName: standardFileName,
-          filePath: `/${userId}/${standardFileName}`,
-          fileSize: imageBuffer.length,
           width: dimensions.finalWidth,
           height: dimensions.finalHeight,
           rotation: territory.rotation
@@ -254,8 +231,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
         // 3. Créer et sauvegarder la MINIATURE
         if (result.miniature) {
-          const thumbnailId = nanoid();
-          const thumbnailFileName = `${thumbnailId}.webp`;
+          const thumbnailFileName = getImageFileName(territory.num, 'miniature');
 
           // Convertir la miniature PNG en WebP avec sharp
           const thumbnailBase64 = result.miniature.replace(/^data:image\/png;base64,/, '');
@@ -267,16 +243,11 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             .toBuffer();
 
           const thumbnailPath = path.join(userDir, thumbnailFileName);
-          await fs.writeFile(thumbnailPath, webpBuffer);
-
-          // Sauvegarder les métadonnées de la miniature
+          await fs.writeFile(thumbnailPath, webpBuffer);          // Sauvegarder les métadonnées de la miniature
           await createTerritoryImage({
             userId,
             territoryNumber: territory.num,
             imageType: 'miniature',
-            fileName: thumbnailFileName,
-            filePath: `/${userId}/${thumbnailFileName}`,
-            fileSize: webpBuffer.length,
             width: userConfig.thumbnailWidth,
             height: Math.round(dimensions.finalHeight / dimensions.finalWidth * userConfig.thumbnailWidth)
           });
@@ -284,60 +255,59 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
         return reply.send({ success: true });
       } else if (imageType === 'large') {
-        // Supprimer les anciennes images large ET originalLarge pour ce territoire
-        const oldLargePaths = await deleteTerritoryImage(userId, territory.num, 'large');
-        const oldOriginalLargePaths = await deleteTerritoryImage(userId, territory.num, 'originalLarge');
-
-        // Supprimer les fichiers physiques
-        for (const imagePath of [...oldLargePaths, ...oldOriginalLargePaths]) {
-          await deleteFileIfExists(imagePath);
-        }
-
         const imageResult = await imageService.generateLargeImage(territory, options);
         imageData = imageResult.dataUrl;
 
         // Créer le dossier utilisateur
         const userDir = path.join(__dirname, '../../public', userId);
-        await fs.mkdir(userDir, { recursive: true });
-
-        const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
-        const imageBuffer = Buffer.from(base64Data, 'base64');
+        await fs.mkdir(userDir, { recursive: true }); const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
 
         // 1. Sauvegarder l'image ORIGINALE LARGE (copie de l'image générée)
-        const originalLargeId = nanoid();
-        const originalLargeFileName = `${originalLargeId}.png`;
+        const originalLargeFileName = getImageFileName(territory.num, 'originalLarge');
         const originalLargeFilePath = path.join(userDir, originalLargeFileName);
-        await fs.writeFile(originalLargeFilePath, imageBuffer);
-
-        await createTerritoryImage({
+        const originalLargeBuffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(originalLargeFilePath, originalLargeBuffer);        await createTerritoryImage({
           userId,
           territoryNumber: territory.num,
           imageType: 'originalLarge',
-          fileName: originalLargeFileName,
-          filePath: `/${userId}/${originalLargeFileName}`,
-          fileSize: imageBuffer.length,
           width: imageResult.width,
           height: imageResult.height,
+          bbox: JSON.stringify(imageResult.bbox), // 🎯 Sauvegarder le bbox !
           rotation: territory.rotation
         });
 
-        // 2. Sauvegarder l'image LARGE (identique à l'originale pour le moment)
-        const largeId = nanoid();
-        const largeFileName = `${largeId}.png`;
+        // 2. Sauvegarder l'image LARGE (copie du fichier originalLarge pour éviter la corruption)
+        const largeFileName = getImageFileName(territory.num, 'large');
         const largeFilePath = path.join(userDir, largeFileName);
-        await fs.writeFile(largeFilePath, imageBuffer);
-
-        await createTerritoryImage({
+        await fs.copyFile(originalLargeFilePath, largeFilePath);        await createTerritoryImage({
           userId,
           territoryNumber: territory.num,
           imageType: 'large',
-          fileName: largeFileName,
-          filePath: `/${userId}/${largeFileName}`,
-          fileSize: imageBuffer.length,
           width: imageResult.width,
           height: imageResult.height,
-          rotation: territory.rotation
+          bbox: JSON.stringify(imageResult.bbox), // 🎯 Sauvegarder le bbox !          rotation: territory.rotation
         });
+
+        // 🛡️ Vérifier que les fichiers existent avant de retourner le succès
+        let retries = 0;
+        const maxRetries = 10;
+        const retryDelay = 100; // ms
+
+        while (retries < maxRetries) {
+          try {
+            await fs.access(originalLargeFilePath);
+            await fs.access(largeFilePath);
+            console.log('✅ Fichiers large vérifiés comme existants après', retries, 'tentatives');
+            break;
+          } catch (error) {
+            retries++;
+            if (retries >= maxRetries) {
+              throw new Error(`Fichiers large non créés après ${maxRetries} tentatives`);
+            }
+            console.log(`⏳ Attente fichiers large (tentative ${retries}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
 
         return reply.send({ success: true });
       } else {
@@ -362,28 +332,68 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     const parse = generateImageWithCropSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ errors: parse.error.errors })
-    }
-
-    try {
+    }    try {
       const { territory, customBbox, cropData, options = {} } = parse.data
       const userId = user.id
 
-      // Supprimer les anciennes images large pour ce territoire
-      const oldImagePaths = await deleteTerritoryImage(userId, territory.num, 'large');
-
-      // Supprimer les fichiers physiques
-      for (const imagePath of oldImagePaths) {
-        await deleteFileIfExists(imagePath);
+      console.log('🎯 Génération avec crop demandée:', {
+        territory: territory.num,
+        customBbox,
+        cropData
+      })      // Si on a des données de crop, on doit calculer le nouveau bbox à partir de l'image existante
+      let finalBbox = customBbox
+      console.log('📦 CustomBbox reçu du frontend:', customBbox)
+      
+      if (cropData) {
+        console.log('✂️ CropData reçu:', cropData)
+        // Récupérer l'image originalLarge existante pour connaître son bbox
+        const existingImage = await getTerritoryImage(userId, territory.num, 'originalLarge')
+        console.log('🔍 Image originalLarge trouvée:', existingImage.length > 0 ? 'OUI' : 'NON')
+        
+        if (existingImage.length > 0 && existingImage[0].bbox) {
+          const currentBbox = JSON.parse(existingImage[0].bbox) as [number, number, number, number]
+          console.log('📍 Bbox actuel de l\'image originalLarge:', currentBbox)
+          
+          // Calculer le nouveau bbox en fonction du crop (en %)
+          // currentBbox format: [minLon, minLat, maxLon, maxLat]
+          const [minLon, minLat, maxLon, maxLat] = currentBbox
+          const bboxWidth = maxLon - minLon
+          const bboxHeight = maxLat - minLat
+          
+          console.log('📏 Dimensions du bbox actuel:', { bboxWidth, bboxHeight })
+            // Convertir les coordonnées de crop (déjà en décimal 0-1) en coordonnées GPS
+          // IMPORTANT: cropData.y est inversé car les coordonnées Y d'image (0 en haut) 
+          // sont inversées par rapport aux coordonnées GPS (latitude croissante vers le nord)
+          const newMinLon = minLon + cropData.x * bboxWidth
+          const newMaxLon = minLon + (cropData.x + cropData.width) * bboxWidth
+          const newMaxLat = maxLat - cropData.y * bboxHeight  // Inversé !
+          const newMinLat = maxLat - (cropData.y + cropData.height) * bboxHeight  // Inversé !
+          
+          finalBbox = [newMinLon, newMinLat, newMaxLon, newMaxLat]
+          console.log('📍 Nouveau bbox calculé pour crop:', {
+            cropData,
+            currentBbox,
+            newBbox: finalBbox,            calculs: {
+              newMinLon: `${minLon} + ${cropData.x} * ${bboxWidth} = ${newMinLon}`,
+              newMaxLon: `${minLon} + ${cropData.x + cropData.width} * ${bboxWidth} = ${newMaxLon}`,
+              newMaxLat: `${maxLat} - ${cropData.y} * ${bboxHeight} = ${newMaxLat}`,
+              newMinLat: `${maxLat} - ${cropData.y + cropData.height} * ${bboxHeight} = ${newMinLat}`
+            }
+          })
+        } else {
+          console.log('⚠️ Pas de bbox existant pour originalLarge, utilisation du bbox fourni par le frontend')
+          console.log('⚠️ ATTENTION: Cela peut être la source du problème si le bbox frontend est incorrect!')
+        }
       }
 
       // Récupérer la configuration utilisateur de la base de données
-      const userConfig = await getUserConfig(userId)
-
-      // Créer le service de génération d'images avec la config utilisateur
+      const userConfig = await getUserConfig(userId)      // Créer le service de génération d'images avec la config utilisateur
       const serviceConfig = {
         ppp: userConfig.ppp,
         largeFactor: parseFloat(userConfig.largeFactor)
-      }      // Calculer les dimensions basées sur la configuration utilisateur
+      }
+
+      // Calculer les dimensions basées sur la configuration utilisateur
       const PAPER_WIDTH_CM = 29.7 // A4 width in cm (constant)
       const PHI = 1.618033988749
 
@@ -439,44 +449,71 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       }
 
       const imageService = new TerritoryImageService(
-        serviceConfig,
-        dimensions,
+        serviceConfig,        dimensions,
         PHI,
         userConfigOptions
       )
 
       const croppedImageResult = await imageService.generateLargeImageWithCustomBbox(
         territory,
-        customBbox,
+        finalBbox, // Utiliser le bbox calculé (ou fourni)
         options,
         cropData
       )
 
       // Créer le dossier utilisateur
       const userDir = path.join(__dirname, '../../public', userId)
-      await fs.mkdir(userDir, { recursive: true })
+      await fs.mkdir(userDir, { recursive: true });
 
-      const imageId = nanoid()
-      const fileName = `${imageId}.png`
       const base64Data = croppedImageResult.dataUrl.replace(/^data:image\/png;base64,/, '')
-      const imageBuffer = Buffer.from(base64Data, 'base64')
-      const filePath = path.join(userDir, fileName)
 
-      await fs.writeFile(filePath, imageBuffer)
+      // 1. Sauvegarder l'image ORIGINALE LARGE (copie de l'image générée avec crop)
+      const originalLargeFileName = getImageFileName(territory.num, 'originalLarge');
+      const originalLargeFilePath = path.join(userDir, originalLargeFileName);
+      const originalLargeBuffer = Buffer.from(base64Data, 'base64');
+      await fs.writeFile(originalLargeFilePath, originalLargeBuffer);      await createTerritoryImage({
+        userId,
+        territoryNumber: territory.num,
+        imageType: 'originalLarge',
+        width: croppedImageResult.width,
+        height: croppedImageResult.height,
+        bbox: JSON.stringify(finalBbox), // Utiliser le bbox final calculé
+        cropData: cropData ? JSON.stringify(cropData) : undefined
+      });
 
-      // Sauvegarder les métadonnées en base
-      const imageRecord = await createTerritoryImage({
+      // 2. Sauvegarder l'image LARGE (copie du fichier originalLarge pour éviter la corruption)
+      const largeFileName = getImageFileName(territory.num, 'large');
+      const largeFilePath = path.join(userDir, largeFileName);
+      await fs.copyFile(originalLargeFilePath, largeFilePath);      await createTerritoryImage({
         userId,
         territoryNumber: territory.num,
         imageType: 'large',
-        fileName,
-        filePath: `/${userId}/${fileName}`,
-        fileSize: imageBuffer.length,
         width: croppedImageResult.width,
         height: croppedImageResult.height,
-        bbox: JSON.stringify(customBbox),
-        cropData: cropData ? JSON.stringify(cropData) : undefined
-      })
+        bbox: JSON.stringify(finalBbox), // Utiliser le bbox final calculé        cropData: cropData ? JSON.stringify(cropData) : undefined
+      });
+
+      // 🛡️ IMPORTANT: Vérifier que les fichiers existent réellement avant de retourner le succès
+      // Cela évite le problème de cache/timing où le frontend essaie de charger une image pas encore écrite
+      let retries = 0;
+      const maxRetries = 10;
+      const retryDelay = 100; // ms
+
+      while (retries < maxRetries) {
+        try {
+          await fs.access(originalLargeFilePath);
+          await fs.access(largeFilePath);
+          console.log('✅ Fichiers crop vérifiés comme existants après', retries, 'tentatives');
+          break;
+        } catch (error) {
+          retries++;
+          if (retries >= maxRetries) {
+            throw new Error(`Fichiers non créés après ${maxRetries} tentatives`);
+          }
+          console.log(`⏳ Attente fichiers crop (tentative ${retries}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
 
       return reply.send({
         success: true
@@ -499,15 +536,16 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
     try {
       const userId = user.id
+      console.log(userId)
       const { territoryNumber, imageType } = request.query as { territoryNumber?: string, imageType?: string }
 
-      const images = await getTerritoryImagesByUser(userId, territoryNumber, imageType)
+      const images = await getTerritoryImagesByUser(userId, territoryNumber, imageType);
 
       return reply.send({
         success: true,
         images: images.map(img => ({
           ...img,
-          imageUrl: img.filePath
+          imageUrl: `/p/${userId}/${getImageFileName(img.territoryNumber, img.imageType)}`
         }))
       })
 
@@ -529,18 +567,17 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
     try {
       const userId = user.id
-      const { territoryNumber, imageType } = request.params as { territoryNumber: string, imageType: string }
-
-      // Récupérer l'image avant suppression pour supprimer le fichier
-      const image = await getTerritoryImage(userId, territoryNumber, imageType)
+      const { territoryNumber, imageType } = request.params as { territoryNumber: string, imageType: string }      // Récupérer l'image avant suppression pour supprimer le fichier
+      const image = await getTerritoryImage(userId, territoryNumber, imageType);
 
       if (image.length > 0) {
-        const filePath = path.join(__dirname, '../../public', image[0].filePath)
+        const imagePath = getImageFilePath(userId, territoryNumber, imageType);
+        const filePath = path.join(__dirname, '../../public', imagePath);
         try {
-          await fs.unlink(filePath)
+          await fs.unlink(filePath);
         } catch (err) {
           // Ignorer les erreurs de suppression de fichier
-          console.warn(`Impossible de supprimer le fichier: ${filePath}`)
+          console.warn(`Impossible de supprimer le fichier: ${filePath}`);
         }
       }
 
@@ -639,7 +676,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
         error: 'Erreur lors de la reconstruction des territoires',
         details: error instanceof Error ? error.message : 'Erreur inconnue'
       })
-    }  })
+    }
+  })
 
   // Route pour mettre à jour un territoire complet (images + layers)
   app.put('/territories/:territoryNumber/complete', async (request, reply) => {
@@ -668,26 +706,17 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       console.log(`🔄 Mise à jour complète du territoire ${territoryNumber} pour l'utilisateur ${userId}`)
 
       // 1. Sauvegarder les images (et supprimer les anciennes)
-      const imagePromises = [];
-
+      const imagePromises: any[] = [];
       if (images.image) {
         imagePromises.push(
           (async () => {
             console.log(`📸 Sauvegarde de l'image standard pour le territoire ${territoryNumber}`)
-            // Supprimer uniquement les anciennes images standard modifiées (pas les originales)
-            const oldImagePaths = await deleteModifiedTerritoryImages(userId, territoryNumber, 'standard')
-            for (const imagePath of oldImagePaths) {
-              const fullPath = path.join(process.cwd(), 'public', imagePath)
-              await deleteFileIfExists(fullPath)
-              console.log(`Fichier supprimé: ${fullPath}`)
-            }
 
-            // Sauvegarder la nouvelle image
-            const imageId = nanoid()
-            const fileName = `${imageId}.png`
+            // Sauvegarder la nouvelle image (remplace automatiquement l'ancienne)
             const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
-            const filePath = path.join(userDir, fileName)
+            const standardFileName = getImageFileName(territoryNumber, 'standard')
+            const filePath = path.join(userDir, standardFileName)
 
             await fs.writeFile(filePath, imageBuffer)
 
@@ -695,31 +724,21 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
               userId,
               territoryNumber,
               imageType: 'standard',
-              fileName,
-              filePath: `/${userId}/${fileName}`,
-              fileSize: imageBuffer.length,
               rotation: territory.rotation
             })
           })()
         )
-      }      if (images.large) {
+      }
+      if (images.large) {
         imagePromises.push(
           (async () => {
             console.log(`📸 Sauvegarde de l'image large pour le territoire ${territoryNumber}`)
-            // Supprimer uniquement les anciennes images large modifiées (pas les originales)
-            const oldImagePaths = await deleteModifiedTerritoryImages(userId, territoryNumber, 'large')
-            for (const imagePath of oldImagePaths) {
-              const fullPath = path.join(process.cwd(), 'public', imagePath)
-              await deleteFileIfExists(fullPath)
-              console.log(`Fichier supprimé: ${fullPath}`)
-            }
 
-            // Sauvegarder la nouvelle image
-            const imageId = nanoid()
-            const fileName = `${imageId}.png`
+            // Sauvegarder la nouvelle image (remplace automatiquement l'ancienne)
             const base64Data = images.large!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
-            const filePath = path.join(userDir, fileName)
+            const largeFileName = getImageFileName(territoryNumber, 'large')
+            const filePath = path.join(userDir, largeFileName)
 
             await fs.writeFile(filePath, imageBuffer)
 
@@ -727,9 +746,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
               userId,
               territoryNumber,
               imageType: 'large',
-              fileName,
-              filePath: `/${userId}/${fileName}`,
-              fileSize: imageBuffer.length,
               rotation: territory.rotation
             })
           })()
@@ -737,41 +753,86 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       }
 
       if (images.miniature) {
-        imagePromises.push(          (async () => {
-            console.log(`🖼️ Sauvegarde de la miniature pour le territoire ${territoryNumber}`)
-            // Supprimer uniquement les anciennes miniatures modifiées (pas les originales)
-            const oldImagePaths = await deleteModifiedTerritoryImages(userId, territoryNumber, 'miniature')
-            for (const imagePath of oldImagePaths) {
-              const fullPath = path.join(process.cwd(), 'public', imagePath)
-              await deleteFileIfExists(fullPath)
-              console.log(`Fichier supprimé: ${fullPath}`)
+        imagePromises.push((async () => {          console.log(`🖼️ Sauvegarde de la miniature pour le territoire ${territoryNumber}`)
+          
+          // Vérifier si c'est une URL ou des données base64
+          const miniaturePrefix = images.miniature!.substring(0, 50)
+          console.log(`🔍 Format de miniature détecté pour ${territoryNumber}:`, miniaturePrefix)
+
+          // Si c'est une URL, on ignore la sauvegarde car l'image existe déjà
+          if (images.miniature!.startsWith('http://') || images.miniature!.startsWith('https://')) {
+            console.log(`⚠️ Miniature est une URL pour ${territoryNumber}, pas de sauvegarde nécessaire`)
+            return
+          }          // Sinon, traiter comme des données base64
+          let base64Data: string
+
+          if (images.miniature!.startsWith('data:image/png;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/png;base64,/, '')
+            console.log(`✅ Format PNG détecté pour ${territoryNumber}`)
+          } else if (images.miniature!.startsWith('data:image/webp;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/webp;base64,/, '')
+            console.log(`✅ Format WebP détecté pour ${territoryNumber}`)
+          } else if (images.miniature!.startsWith('data:image/jpeg;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/jpeg;base64,/, '')
+            console.log(`✅ Format JPEG détecté pour ${territoryNumber}`)
+          } else {
+            // Assumer que c'est déjà du base64 sans en-tête
+            base64Data = images.miniature!
+            console.log(`⚠️ Format inconnu pour ${territoryNumber}, tentative de traitement direct`)
+          } try {
+            const imageBuffer = Buffer.from(base64Data, 'base64')
+            console.log(`📊 Taille du buffer pour ${territoryNumber}: ${imageBuffer.length} bytes`)
+
+            // Vérifier que le buffer n'est pas vide
+            if (imageBuffer.length === 0) {
+              throw new Error('Buffer d\'image vide')
             }
 
-            // Sauvegarder la nouvelle miniature
-            const imageId = nanoid()
-            const fileName = `${imageId}.webp`
-
-            // Convertir la miniature PNG en WebP avec sharp
-            const base64Data = images.miniature!.replace(/^data:image\/png;base64,/, '')
-            const imageBuffer = Buffer.from(base64Data, 'base64')
-
-            // Convertir en WebP avec sharp
+            // Vérifier les premiers bytes du buffer pour identifier le format
+            const header = imageBuffer.subarray(0, 8)
+            console.log(`🔍 En-tête du buffer pour ${territoryNumber}:`, Array.from(header).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '))              // Convertir en WebP avec sharp
             const webpBuffer = await sharp(imageBuffer)
               .webp({ quality: 80 })
-              .toBuffer()
+              .toBuffer();
 
-            const filePath = path.join(userDir, fileName)
-            await fs.writeFile(filePath, webpBuffer)
+            console.log(`✅ Conversion WebP réussie pour ${territoryNumber}, taille: ${webpBuffer.length} bytes`);
+
+            const miniatureFileName = getImageFileName(territoryNumber, 'miniature');
+            const filePath = path.join(userDir, miniatureFileName);
+            await fs.writeFile(filePath, webpBuffer);
 
             await createTerritoryImage({
               userId,
               territoryNumber,
-              imageType: 'miniature',
-              fileName,
-              filePath: `/${userId}/${fileName}`,
-              fileSize: webpBuffer.length
-            })
-          })()
+              imageType: 'miniature'
+            });
+
+          } catch (error) {
+            console.error(`❌ Erreur lors de la conversion de la miniature pour le territoire ${territoryNumber}:`, error)
+
+            // Tentative de fallback : sauvegarder l'image sans conversion
+            try {
+              console.log(`🔄 Tentative de fallback pour ${territoryNumber} - sauvegarde sans conversion`)
+              const imageBuffer = Buffer.from(base64Data, 'base64')
+              const fallbackFileName = getImageFileName(territoryNumber, 'miniature')
+              const fallbackPath = path.join(userDir, fallbackFileName)
+
+              await fs.writeFile(fallbackPath, imageBuffer)
+
+              await createTerritoryImage({
+                userId,
+                territoryNumber,
+                imageType: 'miniature'
+              })
+
+              console.log(`✅ Fallback réussi pour ${territoryNumber} - miniature sauvegardée en PNG`)
+            } catch (fallbackError) {
+              console.error(`❌ Echec du fallback pour ${territoryNumber}:`, fallbackError)
+              // Ne pas faire échouer toute l'opération pour une erreur de miniature
+              console.warn(`⚠️ La miniature du territoire ${territoryNumber} n'a pas pu être sauvegardée`)
+            }
+          }
+        })()
         )
       }
 
@@ -837,7 +898,9 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       return reply.send({
         success: true,
         message: 'Territoire mis à jour avec succès'
-      })    } catch (error) {
+      })
+    }
+    catch (error) {
       console.error('❌ Erreur lors de la mise à jour complète du territoire:', error)
       return reply.status(500).send({
         error: 'Erreur lors de la mise à jour du territoire',
@@ -846,222 +909,186 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     }
   })
 
-  // ROUTES POUR LES LAYERS DE TERRITOIRE
-
-  // Récupérer tous les layers d'un territoire
-  app.get('/territories/:territoryNumber/layers', async (request, reply) => {
-    const { territoryNumber } = request.params as { territoryNumber: string }
-    const { imageType } = request.query as { imageType?: string }
-    const user = await getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
-    }
-    const userId = user.id
-
-    try {
-      const layers = await getTerritoryLayersByUser(userId, territoryNumber, imageType)
-      return reply.send({
-        success: true,
-        data: layers
-      })
-    } catch (error) {
-      console.error('Erreur lors de la récupération des layers:', error)
-      return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la récupération des layers'
-      })
-    }
-  })
-
-  // Créer un nouveau layer
-  app.post('/territories/:territoryNumber/layers', async (request, reply) => {
-    const { territoryNumber } = request.params as { territoryNumber: string }
+  // Route pour sauvegarder UNIQUEMENT les données standard d'un territoire
+  app.put('/territories/:territoryNumber/standard', async (request, reply) => {
     const user = await getAuthUser(request)
     if (!user) {
       return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
     }
 
-    const parse = layerSchema.safeParse(request.body)
+    const parse = updateTerritoryCompleteSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ errors: parse.error.errors })
     }
 
-    const userId = user.id
-    const {
-      imageType,
-      layerType,
-      layerData,
-      style,
-      visible,
-      locked
-    } = parse.data
-
     try {
-      const layer = await createTerritoryLayer({
-        userId,
-        territoryNumber,
-        imageType,
-        layerType,
-        layerData,
-        style,
-        visible,
-        locked
-      })
+      const { territory, images, layers } = parse.data
+      const { territoryNumber } = request.params as { territoryNumber: string }
+      const userId = user.id
 
-      return reply.status(201).send({
-        success: true,
-        data: layer
-      })
-    } catch (error) {
-      console.error('Erreur lors de la création du layer:', error)
-      return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la création du layer'
-      })
-    }
-  })
+      console.log(`💾 Sauvegarde STANDARD UNIQUEMENT du territoire ${territoryNumber}`)
 
-  // Récupérer un layer spécifique
-  app.get('/territories/layers/:layerId', async (request, reply) => {
-    const { layerId } = request.params as { layerId: string }
-    const user = await getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
-    }
-    const userId = user.id
+      // Créer le dossier utilisateur
+      const userDir = path.join(__dirname, '../../public', userId);
+      await fs.mkdir(userDir, { recursive: true });
 
-    try {
-      const layer = await getTerritoryLayer(userId, layerId)
-
-      if (!layer) {
-        return reply.status(404).send({
-          success: false,
-          message: 'Layer non trouvé'
-        })
+      // Sauvegarder UNIQUEMENT l'image standard et la miniature
+      const imagePromises: any[] = [];
+      
+      if (images.image) {
+        imagePromises.push(
+          (async () => {
+            console.log(`📸 Sauvegarde de l'image STANDARD pour le territoire ${territoryNumber}`)
+            const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
+            const imageBuffer = Buffer.from(base64Data, 'base64')
+            const standardFileName = getImageFileName(territoryNumber, 'standard')
+            const filePath = path.join(userDir, standardFileName)
+            await fs.writeFile(filePath, imageBuffer)
+            await createTerritoryImage({
+              userId,
+              territoryNumber,
+              imageType: 'standard',
+              rotation: territory.rotation
+            })
+          })()
+        )
       }
 
-      return reply.send({
-        success: true,
-        data: layer
-      })
+      if (images.miniature) {
+        imagePromises.push((async () => {
+          console.log(`🖼️ Sauvegarde de la MINIATURE pour le territoire ${territoryNumber}`)
+          // ... logique de miniature identique à /complete
+          let base64Data: string
+          if (images.miniature!.startsWith('http://') || images.miniature!.startsWith('https://')) {
+            console.log(`⚠️ Miniature est une URL pour ${territoryNumber}, pas de sauvegarde nécessaire`)
+            return
+          }
+          if (images.miniature!.startsWith('data:image/png;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/png;base64,/, '')
+          } else if (images.miniature!.startsWith('data:image/webp;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/webp;base64,/, '')
+          } else if (images.miniature!.startsWith('data:image/jpeg;base64,')) {
+            base64Data = images.miniature!.replace(/^data:image\/jpeg;base64,/, '')
+          } else {
+            base64Data = images.miniature!
+          }
+          try {
+            const imageBuffer = Buffer.from(base64Data, 'base64')
+            const webpBuffer = await sharp(imageBuffer).webp({ quality: 80 }).toBuffer();
+            const miniatureFileName = getImageFileName(territoryNumber, 'miniature');
+            const filePath = path.join(userDir, miniatureFileName);
+            await fs.writeFile(filePath, webpBuffer);
+            await createTerritoryImage({
+              userId,
+              territoryNumber,
+              imageType: 'miniature'
+            });
+          } catch (error) {
+            console.error(`❌ Erreur lors de la conversion de la miniature pour ${territoryNumber}:`, error)
+          }
+        })())
+      }
+
+      await Promise.all(imagePromises)
+
+      // Sauvegarder UNIQUEMENT les layers standard
+      if (layers.paintLayersImage) {
+        await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'standard')
+        const paintLayers = layers.paintLayersImage
+        for (const layer of paintLayers) {
+          await createTerritoryLayer({
+            userId,
+            territoryNumber,
+            imageType: 'standard',
+            layerType: layer.type,
+            layerData: JSON.stringify(layer.data),
+            style: JSON.stringify(layer.style),
+            visible: layer.visible,
+            locked: layer.locked
+          })
+        }
+        console.log(`🎨 Sauvegarde de ${layers.paintLayersImage.length} layers STANDARD`)
+      }
+
+      console.log(`✅ Territoire ${territoryNumber} (STANDARD) sauvegardé avec succès`)
+      return reply.send({ success: true, message: 'Données standard sauvegardées' })
     } catch (error) {
-      console.error('Erreur lors de la récupération du layer:', error)
+      console.error('❌ Erreur lors de la sauvegarde standard:', error)
       return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la récupération du layer'
+        error: 'Erreur lors de la sauvegarde des données standard',
+        details: error instanceof Error ? error.message : 'Erreur inconnue'
       })
     }
   })
 
-  // Mettre à jour un layer
-  app.patch('/territories/layers/:layerId', async (request, reply) => {
-    const { layerId } = request.params as { layerId: string }
+  // Route pour sauvegarder UNIQUEMENT les données large d'un territoire  
+  app.put('/territories/:territoryNumber/large', async (request, reply) => {
     const user = await getAuthUser(request)
     if (!user) {
       return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
     }
 
-    const parse = updateLayerSchema.safeParse(request.body)
+    const parse = updateTerritoryCompleteSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ errors: parse.error.errors })
     }
 
-    const userId = user.id
-    const updates = parse.data
-
     try {
-      const success = await updateTerritoryLayer(userId, layerId, updates)
+      const { territory, images, layers } = parse.data
+      const { territoryNumber } = request.params as { territoryNumber: string }
+      const userId = user.id
 
-      if (!success) {
-        return reply.status(404).send({
-          success: false,
-          message: 'Layer non trouvé ou non modifié'
+      console.log(`💾 Sauvegarde LARGE UNIQUEMENT du territoire ${territoryNumber}`)
+
+      // Créer le dossier utilisateur
+      const userDir = path.join(__dirname, '../../public', userId);
+      await fs.mkdir(userDir, { recursive: true });
+
+      // Sauvegarder UNIQUEMENT l'image large
+      if (images.large) {
+        console.log(`📸 Sauvegarde de l'image LARGE pour le territoire ${territoryNumber}`)
+        const base64Data = images.large.replace(/^data:image\/png;base64,/, '')
+        const imageBuffer = Buffer.from(base64Data, 'base64')
+        const largeFileName = getImageFileName(territoryNumber, 'large')
+        const filePath = path.join(userDir, largeFileName)
+        await fs.writeFile(filePath, imageBuffer)
+        await createTerritoryImage({
+          userId,
+          territoryNumber,
+          imageType: 'large',
+          rotation: territory.rotation
         })
       }
 
-      return reply.send({
-        success: true,
-        message: 'Layer mis à jour avec succès'
-      })
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du layer:', error)
-      return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la mise à jour du layer'
-      })
-    }
-  })
-
-  // Supprimer un layer
-  app.delete('/territories/layers/:layerId', async (request, reply) => {
-    const { layerId } = request.params as { layerId: string }
-    const user = await getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
-    }
-    const userId = user.id
-
-    try {
-      const success = await deleteTerritoryLayer(userId, layerId)
-
-      if (!success) {
-        return reply.status(404).send({
-          success: false,
-          message: 'Layer non trouvé ou non supprimé'
-        })
+      // Sauvegarder UNIQUEMENT les layers large
+      if (layers.paintLayersLarge) {
+        await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'large')
+        const paintLayers = layers.paintLayersLarge
+        for (const layer of paintLayers) {
+          await createTerritoryLayer({
+            userId,
+            territoryNumber,
+            imageType: 'large',
+            layerType: layer.type,
+            layerData: JSON.stringify(layer.data),
+            style: JSON.stringify(layer.style),
+            visible: layer.visible,
+            locked: layer.locked
+          })
+        }
+        console.log(`🎨 Sauvegarde de ${layers.paintLayersLarge.length} layers LARGE`)
       }
 
-      return reply.send({
-        success: true,
-        message: 'Layer supprimé avec succès'
-      })
+      console.log(`✅ Territoire ${territoryNumber} (LARGE) sauvegardé avec succès`)
+      return reply.send({ success: true, message: 'Données large sauvegardées' })
     } catch (error) {
-      console.error('Erreur lors de la suppression du layer:', error)
+      console.error('❌ Erreur lors de la sauvegarde large:', error)
       return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la suppression du layer'
+        error: 'Erreur lors de la sauvegarde des données large',
+        details: error instanceof Error ? error.message : 'Erreur inconnue'
       })
     }
   })
 
-  // Supprimer tous les layers d'un territoire
-  app.delete('/territories/:territoryNumber/layers', async (request, reply) => {
-    const { territoryNumber } = request.params as { territoryNumber: string }
-    const { imageType } = request.query as { imageType?: string }
-    const user = await getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
-    }
-    const userId = user.id
-
-    try {
-      const count = await deleteTerritoryLayersByTerritory(userId, territoryNumber, imageType)
-
-      return reply.send({
-        success: true,
-        message: `${count} layers supprimés avec succès`
-      })
-    } catch (error) {
-      console.error('Erreur lors de la suppression des layers:', error)
-      return reply.status(500).send({
-        success: false,
-        message: 'Erreur lors de la suppression des layers'
-      })
-    }
-  })
-
-  /**
-   * Supprime un fichier du système de fichiers
-   */
-  const deleteFileIfExists = async (filePath: string) => {
-    const fullPath = path.join(__dirname, '../../public', filePath.replace(/^\//, ''));
-    try {
-      await fs.access(fullPath);
-      await fs.unlink(fullPath);
-      console.log(`Fichier supprimé: ${fullPath}`);
-    } catch (error) {
-      // Le fichier n'existe peut-être pas, ignorer l'erreur
-      console.log(`Fichier non trouvé ou erreur lors de la suppression: ${fullPath}`);
-    }
-  }
+  // ...existing code...
 }

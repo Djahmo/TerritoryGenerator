@@ -32,10 +32,10 @@ interface PaintProps {
   }) => void;
   isLarge?: boolean;
   territoryPolygon?: { lat: number; lon: number }[];
-  territory: Territory // Ajout de la propriété polygone du territoire  territory?: any; // Objet territoire complet (optionnel)
+  territory?: Territory; // Objet territoire complet (optionnel)
 }
 
-const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = false, territoryPolygon, territory }) => {
+const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = false, territory }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
@@ -387,7 +387,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     setIsDrawing(true);
     setStartPoint(point);
 
-    const newShape = createToolShape(selectedTool, colorToUse, strokeWidth, fontSize, point);    if (selectedTool === 'parking') {
+    const newShape = createToolShape(selectedTool, colorToUse, strokeWidth, fontSize, point);
+     if (selectedTool === 'parking') {
       if (newShape) {
         const newObjects = [...objects, newShape];
         setObjects(newObjects);
@@ -397,34 +398,22 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
       setStartPoint(null);
       setCurrentShape(null);    } else if (selectedTool === 'compass') {
       if (newShape) {
-        // On utilise le territoire actuel pour calculer la rotation
-        try {
-          // Importer dynamiquement les utilitaires compass pour éviter des dépendances circulaires
-          import('../../../utils/compassUtils').then(({ calculateTerritoryOrientation }) => {
-            // Utiliser l'objet territoire complet s'il est disponible, sinon utiliser juste le polygone
-            let rotation;
-            if (territory && territory.rotation !== undefined) {
-              // Utiliser directement la rotation stockée dans l'objet territoire
-              rotation = territory.rotation;
-            } else if (territoryPolygon && territoryPolygon.length > 0) {
-              // Calculer la rotation à partir du polygone
-              rotation = calculateTerritoryOrientation(territoryPolygon);
-            } else {
-              // Aucune information de rotation disponible
-              rotation = 0;
-            }
 
-            // Mettre à jour l'objet compass avec la rotation calculée
+        try {
+            // 🧭 IMPORTANT: Sur les plans larges, le compass ne doit jamais avoir de rotation
+            // car les plans larges ne sont jamais orientés/rotés - le Nord doit toujours pointer vers le haut
+            const compassRotation = isLarge ? 0 : (territory && territory.rotation ? (Math.abs(Math.abs(territory.rotation) - Math.PI) < Math.PI / 2 ? Math.PI + territory.rotation : territory.rotation) : 0);
+
             const compassWithRotation = {
               ...newShape,
-              rotation
+              rotation: compassRotation
             };
+
             const newObjects = [...objects, compassWithRotation];
             setObjects(newObjects);
             addToHistory(newObjects);
-          });
         } catch (error) {
-          console.warn('Impossible de calculer la rotation du territoire:', error);
+          console.warn('🧭 Impossible de calculer la rotation du territoire:', error);
           const newObjects = [...objects, newShape];
           setObjects(newObjects);
           addToHistory(newObjects);

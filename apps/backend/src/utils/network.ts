@@ -8,7 +8,6 @@ export const fetchWithRetry = async (
 ): Promise<Response> => {
   for (let i = 0; i < retries; i++) {
     try {
-      console.log(`NETWORK: Tentative ${i+1}/${retries} pour l'URL: ${url.substring(0, 100)}...`)
       const response = await fetch(url)
       if (!response.ok) {
         console.error(`NETWORK ERROR: Erreur HTTP ${response.status}: ${response.statusText}`)
@@ -81,12 +80,5 @@ export const buildIgnUrl = (
     FORMAT: format
   })
 
-  const url = `${baseUrl}?${params.toString()}`
-
-  // Debug: afficher l'URL complète
-  console.log('🌐 URL WMS complète:', url)
-  console.log('📍 BBOX:', bboxStr)
-  console.log('📏 SIZE:', size)
-
-  return url
+  return `${baseUrl}?${params.toString()}`
 }
