@@ -310,22 +310,41 @@ export class TerritoryImageService {
       // 4. Création du canvas de base
       const canvas = createCanvas(this.dimensions.largeRawSize || this.dimensions.rawSize, this.dimensions.largeRawSize || this.dimensions.rawSize)
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(mapImage, 0, 0)
-
-      // 5. Calcul des dimensions finales basées sur le ratio du crop
-      const referenceDimension = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
-      let finalWidth: number
-      let finalHeight: number
-
-      if (cropAspectRatio >= 1) {
-        // Crop plus large que haut (paysage)
-        finalWidth = referenceDimension
-        finalHeight = Math.round(referenceDimension / cropAspectRatio)
+      ctx.drawImage(mapImage, 0, 0)      // 5. 🎯 NOUVELLE LOGIQUE : Utiliser les dimensions optimales configurées
+      // Le crop ne sert QUE pour déterminer l'orientation, pas les dimensions finales
+      
+      // Déterminer l'orientation du crop
+      const cropIsPortrait = cropAspectRatio < 1;
+      
+      // Récupérer les dimensions optimales configurées  
+      const configWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth;
+      const configHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight;
+      
+      // Déterminer l'orientation de la config par défaut
+      const configIsPortrait = configHeight > configWidth;
+      
+      // Choisir les dimensions finales selon l'orientation du crop
+      let finalWidth: number;
+      let finalHeight: number;
+      
+      if (cropIsPortrait === configIsPortrait) {
+        // Même orientation : utiliser les dimensions telles quelles
+        finalWidth = configWidth;
+        finalHeight = configHeight;
       } else {
-        // Crop plus haut que large (portrait)
-        finalHeight = referenceDimension
-        finalWidth = Math.round(referenceDimension * cropAspectRatio)
+        // Orientation différente : inverser les dimensions
+        finalWidth = configHeight;
+        finalHeight = configWidth;
       }
+      
+      console.log('🎯 Dimensions crop optimisées:', {
+        cropAspectRatio,
+        cropIsPortrait,
+        configDimensions: `${configWidth}x${configHeight}`,
+        configIsPortrait,
+        finalDimensions: `${finalWidth}x${finalHeight}`,
+        inverted: cropIsPortrait !== configIsPortrait
+      });
 
       const finalCanvas = cropAndResize(
         canvas,

@@ -55,27 +55,3 @@ export const success = (text: string): void => {
   const success = t(text)
   toast.success(success)
 }
-
-export let isOnline = false;
-
-export const checkOnlineStatus = async () => {
-  try {
-    await send('https://reqres.in/', 'HEAD', { cache: 'no-store' })
-    isOnline = true
-  } catch {
-    isOnline = false
-  }
-}
-
-setInterval(async () => {
-  try {
-    await send('https://reqres.in/', 'HEAD', { cache: 'no-store' });
-    if (!isOnline)
-      toast.success(t('common.status.online'))
-    isOnline = true;
-  } catch (e) {
-    if (isOnline)
-      toast.warning(t('common.status.offline'))
-    isOnline = false;
-  }
-}, 10000);

@@ -444,12 +444,11 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
         ignApiCRS: userConfig.ignApiCRS,
         networkRetries: userConfig.networkRetries,
         networkDelay: userConfig.networkDelay,
-        ignApiRateLimit: userConfig.ignApiRateLimit,
-        ...options // Les options passées en paramètre prennent le dessus
+        ignApiRateLimit: userConfig.ignApiRateLimit,        ...options // Les options passées en paramètre prennent le dessus
       }
 
       const imageService = new TerritoryImageService(
-        serviceConfig,        dimensions,
+        serviceConfig,        dimensions, // Les dimensions originales - l'optimisation se fait dans le service
         PHI,
         userConfigOptions
       )

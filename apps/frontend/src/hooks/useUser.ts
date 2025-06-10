@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { checkOnlineStatus, isOnline, sendApiC } from '../utils'
+import { sendApiC } from '../utils'
 import { User } from '%/types'
 
 interface UserState {
@@ -20,12 +20,6 @@ export const useUser = create<UserState>()(
       user: null,
       loading: true,
       initialized: false,      fetchMe: async () => {
-        await checkOnlineStatus()
-        if (!isOnline) {
-          set({ loading: false, initialized: true })
-          return
-        }
-
         set({ loading: true })
 
         try {
