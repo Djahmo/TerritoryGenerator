@@ -41,10 +41,9 @@ export const clampOffset = (
   const imgWidth = img.width * zoom
   const imgHeight = img.height * zoom
   let clampedX = offset.x
-  let clampedY = offset.y
-  // Détecter les images portrait avec hauteur limitée
-  // IMPORTANT: Appliquer SEULEMENT aux images en format portrait (height > width)
+  let clampedY = offset.y  // Détecter les images portrait avec hauteur limitée ET les images carrées
   const isPortraitWithHeightLimit = img.height > 700 && img.height > img.width
+  const isSquareImage = img.height === img.width
 
   // Détecter si l'image est plus petite que le canvas sur une dimension
   const imageWidthSmallerThanCanvas = imgWidth < canvasWidth
@@ -58,7 +57,29 @@ export const clampOffset = (
     const minOffsetY = canvasHeight - imgHeight - canvasHeight * 0.5
 
     clampedX = Math.min(maxOffsetX, Math.max(minOffsetX, offset.x))
-    clampedY = Math.min(maxOffsetY, Math.max(minOffsetY, offset.y))  } else if (isPortraitWithHeightLimit) {
+    clampedY = Math.min(maxOffsetY, Math.max(minOffsetY, offset.y))
+
+  } else if (isSquareImage) {
+    // Pour les images carrées : centrer comme pour les petites images
+    if (imageWidthSmallerThanCanvas) {
+      const maxOffsetX = canvasWidth * 0.5
+      const minOffsetX = canvasWidth - imgWidth - canvasWidth * 0.5
+      clampedX = Math.min(maxOffsetX, Math.max(minOffsetX, offset.x))
+    } else {
+      // Si l'image carrée est plus large que le canvas, comportement classique
+      clampedX = Math.min(0, Math.max(canvasWidth - imgWidth, offset.x))
+    }
+
+    // Axe Y : contraintes selon la taille de l'image
+    if (imgHeight >= canvasHeight) {
+      clampedY = Math.min(0, Math.max(canvasHeight - imgHeight, offset.y))
+    } else {
+      const maxOffsetY = canvasHeight * 0.5
+      const minOffsetY = canvasHeight - imgHeight - canvasHeight * 0.5
+      clampedY = Math.min(maxOffsetY, Math.max(minOffsetY, offset.y))
+    }
+
+  } else if (isPortraitWithHeightLimit) {
     // Pour les images portrait (hauteur > 700px) :
     // - Axe X : limites spécifiques basées sur la largeur de l'image au zoom minimum
     // - Axe Y : contraintes classiques (haut/bas)

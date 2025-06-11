@@ -17,7 +17,6 @@ const Territories: FC = () => {
     useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
-      console.log(cache.territories)
     } else {
       navigate('/')
     }

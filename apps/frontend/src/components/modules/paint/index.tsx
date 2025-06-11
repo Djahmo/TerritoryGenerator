@@ -166,16 +166,17 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
       setImg(img);
 
       const containerRect = container.getBoundingClientRect();
-      const canvasWidth = containerRect.width;
+      const canvasWidth = containerRect.width;      let canvasHeight, zoomMin;
 
-      let canvasHeight, zoomMin;
-
-      if (img.height > 700 && img.height > img.width) {
+      // Traiter les images carrées comme des images verticales
+      if ((img.height > 700 && img.height > img.width) || (img.height === img.width)) {
+        // Image verticale OU carrée - limiter la hauteur à 700px
         canvasHeight = 700;
         const heightRatio = img.height / 700;
         const adjustedImgWidth = img.width / heightRatio;
         zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
       } else {
+        // Image horizontale - adapter la hauteur selon le ratio
         const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
         canvasHeight = Math.min(calculatedHeight, 700);
         zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });

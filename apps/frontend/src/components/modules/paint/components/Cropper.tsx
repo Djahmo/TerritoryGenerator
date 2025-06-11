@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import Modal from '../../../ui/Modal';
+import { useApiConfig } from '@/hooks/useApiConfig';
 
 interface CropperProps {
   src: string;
@@ -19,6 +20,8 @@ interface CropperProps {
 }
 
 const Cropper: React.FC<CropperProps> = ({ src, open, onClose, onApply, isLoading = false }) => {
+  const { config } = useApiConfig();
+  
   const [crop, setCrop] = useState<Crop>({
     unit: 'px',
     width: 50,
@@ -34,18 +37,19 @@ const Cropper: React.FC<CropperProps> = ({ src, open, onClose, onApply, isLoadin
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    if (!src) return;
+    if (!src || !config) return;
     const img = new Image();
-    img.onload = () => {
-      const aspectRatio = img.width / img.height;
-      setOriginalAspect(aspectRatio);
-      setAspect(aspectRatio);
+    img.onload = () => {      // 🎯 UTILISER LE RATIO DE LA CONFIG LARGE au lieu du ratio de l'image
+      const configAspectRatio = config.largeRatioX / config.largeRatioY;
+      
+      setOriginalAspect(configAspectRatio);
+      setAspect(configAspectRatio);
       setIsAspectFlipped(false);
       setImageDimensions({ width: img.width, height: img.height });
     };
     img.src = src;
     setDisplaySrc(src);
-  }, [src]);
+  }, [src, config]);
 
   const handleFlipAspect = () => {
     const newFlippedState = !isAspectFlipped;

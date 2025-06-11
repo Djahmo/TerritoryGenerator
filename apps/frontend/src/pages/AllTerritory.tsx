@@ -183,9 +183,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
             }, cache?.territories) // Passer les territoires existants pour le diff// IMPORTANT: Recharger depuis le backend pour récupérer
             // les territoires avec les layers et images associés
             await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre un peu
-            console.log('🔄 Rechargement des territoires depuis le backend...')
             await loadFromBackend()
-            console.log('✅ Territoires rechargés depuis le backend')
           }
         } catch (error) {
           console.error('❌ Erreur lors du traitement du fichier:', error)
@@ -379,9 +377,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
 
                 // Attendre un peu puis recharger depuis le backend
                 setTimeout(async () => {
-                  console.log('🔄 Rechargement des territoires après re-téléversement...')
                   await loadFromBackend()
-                  console.log('✅ Territoires rechargés après re-téléversement')
                 }, 2000) // 2 secondes pour laisser le temps au traitement
               }}
               loading={imgLoading}

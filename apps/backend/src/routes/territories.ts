@@ -118,7 +118,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       const { territory, imageType, options = {} } = parse.data
       const userId = user.id
 
-      console.log(`🎯 Génération d'image demandée - Type: ${imageType}, Territoire: ${territory.num}, User: ${userId}`);
 
       // Récupérer la configuration utilisateur de la base de données
       const userConfig = await getUserConfig(userId)
@@ -297,14 +296,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
           try {
             await fs.access(originalLargeFilePath);
             await fs.access(largeFilePath);
-            console.log('✅ Fichiers large vérifiés comme existants après', retries, 'tentatives');
             break;
           } catch (error) {
             retries++;
             if (retries >= maxRetries) {
               throw new Error(`Fichiers large non créés après ${maxRetries} tentatives`);
             }
-            console.log(`⏳ Attente fichiers large (tentative ${retries}/${maxRetries})...`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
         }
@@ -332,57 +329,33 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     const parse = generateImageWithCropSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ errors: parse.error.errors })
-    }    try {
-      const { territory, customBbox, cropData, options = {} } = parse.data
+    }    try {      const { territory, customBbox, cropData, options = {} } = parse.data
       const userId = user.id
-
-      console.log('🎯 Génération avec crop demandée:', {
-        territory: territory.num,
-        customBbox,
-        cropData
-      })      // Si on a des données de crop, on doit calculer le nouveau bbox à partir de l'image existante
       let finalBbox = customBbox
-      console.log('📦 CustomBbox reçu du frontend:', customBbox)
-
+      
       if (cropData) {
-        console.log('✂️ CropData reçu:', cropData)
         // Récupérer l'image originalLarge existante pour connaître son bbox
         const existingImage = await getTerritoryImage(userId, territory.num, 'originalLarge')
-        console.log('🔍 Image originalLarge trouvée:', existingImage.length > 0 ? 'OUI' : 'NON')
 
         if (existingImage.length > 0 && existingImage[0].bbox) {
           const currentBbox = JSON.parse(existingImage[0].bbox) as [number, number, number, number]
-          console.log('📍 Bbox actuel de l\'image originalLarge:', currentBbox)
 
-          // Calculer le nouveau bbox en fonction du crop (en %)
-          // currentBbox format: [minLon, minLat, maxLon, maxLat]
           const [minLon, minLat, maxLon, maxLat] = currentBbox
           const bboxWidth = maxLon - minLon
           const bboxHeight = maxLat - minLat
-
-          console.log('📏 Dimensions du bbox actuel:', { bboxWidth, bboxHeight })
-            // Convertir les coordonnées de crop (déjà en décimal 0-1) en coordonnées GPS
-          // IMPORTANT: cropData.y est inversé car les coordonnées Y d'image (0 en haut)
-          // sont inversées par rapport aux coordonnées GPS (latitude croissante vers le nord)
-          const newMinLon = minLon + cropData.x * bboxWidth
-          const newMaxLon = minLon + (cropData.x + cropData.width) * bboxWidth
-          const newMaxLat = maxLat - cropData.y * bboxHeight  // Inversé !
-          const newMinLat = maxLat - (cropData.y + cropData.height) * bboxHeight  // Inversé !
+          
+          // Calculer le nouveau bbox basé sur les coordonnées de crop
+          // Les coordonnées de crop sont normalisées (0-1) par rapport à l'image affichée
+          const newMinLon = minLon + (cropData.x * bboxWidth)
+          const newMaxLon = minLon + ((cropData.x + cropData.width) * bboxWidth)
+          
+          // Pour les coordonnées Y, attention à l'inversion :
+          // Dans l'image : Y=0 en haut, Y=1 en bas
+          // Dans les coordonnées géo : minLat=bas, maxLat=haut
+          const newMaxLat = maxLat - (cropData.y * bboxHeight)
+          const newMinLat = maxLat - ((cropData.y + cropData.height) * bboxHeight)
 
           finalBbox = [newMinLon, newMinLat, newMaxLon, newMaxLat]
-          console.log('📍 Nouveau bbox calculé pour crop:', {
-            cropData,
-            currentBbox,
-            newBbox: finalBbox,            calculs: {
-              newMinLon: `${minLon} + ${cropData.x} * ${bboxWidth} = ${newMinLon}`,
-              newMaxLon: `${minLon} + ${cropData.x + cropData.width} * ${bboxWidth} = ${newMaxLon}`,
-              newMaxLat: `${maxLat} - ${cropData.y} * ${bboxHeight} = ${newMaxLat}`,
-              newMinLat: `${maxLat} - ${cropData.y + cropData.height} * ${bboxHeight} = ${newMinLat}`
-            }
-          })
-        } else {
-          console.log('⚠️ Pas de bbox existant pour originalLarge, utilisation du bbox fourni par le frontend')
-          console.log('⚠️ ATTENTION: Cela peut être la source du problème si le bbox frontend est incorrect!')
         }
       }
 
@@ -502,14 +475,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
         try {
           await fs.access(originalLargeFilePath);
           await fs.access(largeFilePath);
-          console.log('✅ Fichiers crop vérifiés comme existants après', retries, 'tentatives');
           break;
         } catch (error) {
           retries++;
           if (retries >= maxRetries) {
             throw new Error(`Fichiers non créés après ${maxRetries} tentatives`);
           }
-          console.log(`⏳ Attente fichiers crop (tentative ${retries}/${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
@@ -535,7 +506,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
     try {
       const userId = user.id
-      console.log(userId)
       const { territoryNumber, imageType } = request.query as { territoryNumber?: string, imageType?: string }
 
       const images = await getTerritoryImagesByUser(userId, territoryNumber, imageType);
@@ -702,14 +672,11 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       const userDir = path.join(__dirname, '../../public', userId);
       await fs.mkdir(userDir, { recursive: true });
 
-      console.log(`🔄 Mise à jour complète du territoire ${territoryNumber} pour l'utilisateur ${userId}`)
-
       // 1. Sauvegarder les images (et supprimer les anciennes)
       const imagePromises: any[] = [];
       if (images.image) {
         imagePromises.push(
           (async () => {
-            console.log(`📸 Sauvegarde de l'image standard pour le territoire ${territoryNumber}`)
 
             // Sauvegarder la nouvelle image (remplace automatiquement l'ancienne)
             const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
@@ -731,7 +698,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       if (images.large) {
         imagePromises.push(
           (async () => {
-            console.log(`📸 Sauvegarde de l'image large pour le territoire ${territoryNumber}`)
 
             // Sauvegarder la nouvelle image (remplace automatiquement l'ancienne)
             const base64Data = images.large!.replace(/^data:image\/png;base64,/, '')
@@ -752,49 +718,33 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       }
 
       if (images.miniature) {
-        imagePromises.push((async () => {          console.log(`🖼️ Sauvegarde de la miniature pour le territoire ${territoryNumber}`)
-
-          // Vérifier si c'est une URL ou des données base64
-          const miniaturePrefix = images.miniature!.substring(0, 50)
-          console.log(`🔍 Format de miniature détecté pour ${territoryNumber}:`, miniaturePrefix)
-
+        imagePromises.push((async () => {
           // Si c'est une URL, on ignore la sauvegarde car l'image existe déjà
           if (images.miniature!.startsWith('http://') || images.miniature!.startsWith('https://')) {
-            console.log(`⚠️ Miniature est une URL pour ${territoryNumber}, pas de sauvegarde nécessaire`)
             return
           }          // Sinon, traiter comme des données base64
           let base64Data: string
 
           if (images.miniature!.startsWith('data:image/png;base64,')) {
             base64Data = images.miniature!.replace(/^data:image\/png;base64,/, '')
-            console.log(`✅ Format PNG détecté pour ${territoryNumber}`)
           } else if (images.miniature!.startsWith('data:image/webp;base64,')) {
             base64Data = images.miniature!.replace(/^data:image\/webp;base64,/, '')
-            console.log(`✅ Format WebP détecté pour ${territoryNumber}`)
           } else if (images.miniature!.startsWith('data:image/jpeg;base64,')) {
             base64Data = images.miniature!.replace(/^data:image\/jpeg;base64,/, '')
-            console.log(`✅ Format JPEG détecté pour ${territoryNumber}`)
           } else {
             // Assumer que c'est déjà du base64 sans en-tête
             base64Data = images.miniature!
-            console.log(`⚠️ Format inconnu pour ${territoryNumber}, tentative de traitement direct`)
           } try {
             const imageBuffer = Buffer.from(base64Data, 'base64')
-            console.log(`📊 Taille du buffer pour ${territoryNumber}: ${imageBuffer.length} bytes`)
 
             // Vérifier que le buffer n'est pas vide
             if (imageBuffer.length === 0) {
               throw new Error('Buffer d\'image vide')
             }
 
-            // Vérifier les premiers bytes du buffer pour identifier le format
-            const header = imageBuffer.subarray(0, 8)
-            console.log(`🔍 En-tête du buffer pour ${territoryNumber}:`, Array.from(header).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '))              // Convertir en WebP avec sharp
             const webpBuffer = await sharp(imageBuffer)
               .webp({ quality: 80 })
               .toBuffer();
-
-            console.log(`✅ Conversion WebP réussie pour ${territoryNumber}, taille: ${webpBuffer.length} bytes`);
 
             const miniatureFileName = getImageFileName(territoryNumber, 'miniature');
             const filePath = path.join(userDir, miniatureFileName);
@@ -811,7 +761,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
             // Tentative de fallback : sauvegarder l'image sans conversion
             try {
-              console.log(`🔄 Tentative de fallback pour ${territoryNumber} - sauvegarde sans conversion`)
               const imageBuffer = Buffer.from(base64Data, 'base64')
               const fallbackFileName = getImageFileName(territoryNumber, 'miniature')
               const fallbackPath = path.join(userDir, fallbackFileName)
@@ -824,7 +773,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
                 imageType: 'miniature'
               })
 
-              console.log(`✅ Fallback réussi pour ${territoryNumber} - miniature sauvegardée en PNG`)
             } catch (fallbackError) {
               console.error(`❌ Echec du fallback pour ${territoryNumber}:`, fallbackError)
               // Ne pas faire échouer toute l'opération pour une erreur de miniature
@@ -861,7 +809,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             }
           })()
         )
-        console.log(`🎨 Sauvegarde de ${layers.paintLayersImage.length} layers d'image standard`)
       }
 
       if (layers.paintLayersLarge && layers.paintLayersLarge.length > 0) {
@@ -886,13 +833,10 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             }
           })()
         )
-        console.log(`🎨 Sauvegarde de ${layers.paintLayersLarge.length} layers d'image large`)
       }
 
       // Attendre que tous les layers soient sauvegardés
       await Promise.all(layerPromises)
-
-      console.log(`✅ Territoire ${territoryNumber} mis à jour avec succès`)
 
       return reply.send({
         success: true,
@@ -925,8 +869,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       const { territoryNumber } = request.params as { territoryNumber: string }
       const userId = user.id
 
-      console.log(`💾 Sauvegarde STANDARD UNIQUEMENT du territoire ${territoryNumber}`)
-
       // Créer le dossier utilisateur
       const userDir = path.join(__dirname, '../../public', userId);
       await fs.mkdir(userDir, { recursive: true });
@@ -937,7 +879,6 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       if (images.image) {
         imagePromises.push(
           (async () => {
-            console.log(`📸 Sauvegarde de l'image STANDARD pour le territoire ${territoryNumber}`)
             const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
             const standardFileName = getImageFileName(territoryNumber, 'standard')
@@ -955,11 +896,9 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
 
       if (images.miniature) {
         imagePromises.push((async () => {
-          console.log(`🖼️ Sauvegarde de la MINIATURE pour le territoire ${territoryNumber}`)
           // ... logique de miniature identique à /complete
           let base64Data: string
           if (images.miniature!.startsWith('http://') || images.miniature!.startsWith('https://')) {
-            console.log(`⚠️ Miniature est une URL pour ${territoryNumber}, pas de sauvegarde nécessaire`)
             return
           }
           if (images.miniature!.startsWith('data:image/png;base64,')) {
@@ -1006,10 +945,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             locked: layer.locked
           })
         }
-        console.log(`🎨 Sauvegarde de ${layers.paintLayersImage.length} layers STANDARD`)
       }
-
-      console.log(`✅ Territoire ${territoryNumber} (STANDARD) sauvegardé avec succès`)
       return reply.send({ success: true, message: 'Données standard sauvegardées' })
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde standard:', error)
@@ -1037,15 +973,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       const { territoryNumber } = request.params as { territoryNumber: string }
       const userId = user.id
 
-      console.log(`💾 Sauvegarde LARGE UNIQUEMENT du territoire ${territoryNumber}`)
-
       // Créer le dossier utilisateur
       const userDir = path.join(__dirname, '../../public', userId);
       await fs.mkdir(userDir, { recursive: true });
 
       // Sauvegarder UNIQUEMENT l'image large
       if (images.large) {
-        console.log(`📸 Sauvegarde de l'image LARGE pour le territoire ${territoryNumber}`)
         const base64Data = images.large.replace(/^data:image\/png;base64,/, '')
         const imageBuffer = Buffer.from(base64Data, 'base64')
         const largeFileName = getImageFileName(territoryNumber, 'large')
@@ -1075,10 +1008,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             locked: layer.locked
           })
         }
-        console.log(`🎨 Sauvegarde de ${layers.paintLayersLarge.length} layers LARGE`)
       }
 
-      console.log(`✅ Territoire ${territoryNumber} (LARGE) sauvegardé avec succès`)
       return reply.send({ success: true, message: 'Données large sauvegardées' })
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde large:', error)

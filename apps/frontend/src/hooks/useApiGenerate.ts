@@ -23,18 +23,10 @@ export const useApiGenerate = () => {
     if (existingTerritories && existingTerritories.length > 0) {
       const existingNums = new Set(existingTerritories.map(t => t.num));
       territoriesToGenerate = territories.filter(t => !existingNums.has(t.num));
-
-      console.log(`📊 Diff des territoires:`, {
-        total: territories.length,
-        existants: existingTerritories.length,
-        nouveaux: territoriesToGenerate.length,
-        nouveauxNums: territoriesToGenerate.map(t => t.num)
-      });
     }
 
     // Si aucun nouveau territoire, on évite la génération
     if (territoriesToGenerate.length === 0) {
-      console.log('✅ Aucun nouveau territoire à générer');
       setLoading(false);
       return;
     }
@@ -62,7 +54,6 @@ export const useApiGenerate = () => {
                 return
               }
 
-              console.log(`🖼️ Génération de l'image pour le territoire ${territory.num}...`);
               await apiService.generateStandardImage(territory)
 
               if (abortControllerRef.current?.signal.aborted) {
