@@ -161,22 +161,49 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
       convertGpxToGeoJSON()
     }
   }, [cache, loading])
+
   useEffect(() => {
     (async () => {
       if (content && type) {
         try {
           setError(null)
-          const parsed = parse(content, type)
-          setTerritories(parsed.sort((a, b) => a.num.localeCompare(b.num)))
-          if (parsed.length) {
-            const gpxData = makeGpx(parsed)
+          const newTerritories = parse(content, type)
+          
+          // Fusionner avec les territoires existants pour préserver les noms personnalisés
+          let finalTerritories = newTerritories
+          
+          // Si on a des territoires existants en cache, fusionner intelligemment
+          if (cache?.territories?.length) {
+            console.log('🔄 Fusion des territoires existants avec les nouveaux pour préserver les noms personnalisés')
+            
+            finalTerritories = newTerritories.map(newTerritory => {
+              // Chercher un territoire existant avec le même numéro
+              const existingTerritory = cache.territories.find(existing => existing.num === newTerritory.num)
+              
+              if (existingTerritory && existingTerritory.name && existingTerritory.name !== newTerritory.name) {
+                // Préserver le nom personnalisé existant
+                console.log(`📝 Préservation du nom personnalisé pour ${newTerritory.num}: "${existingTerritory.name}" (au lieu de "${newTerritory.name}")`)
+                return {
+                  ...newTerritory,
+                  name: existingTerritory.name // Garder le nom personnalisé
+                }
+              }
+              
+              return newTerritory
+            })
+          }
+          
+          setTerritories(finalTerritories.sort((a, b) => a.num.localeCompare(b.num)))
+          
+          if (finalTerritories.length) {
+            const gpxData = makeGpx(finalTerritories)
 
             // Sauvegarde des données au backend
             await apiService.saveTerritoryData(gpxData)
 
             // Mise à jour des données locales immédiatement
             updateGpx(gpxData)            // Génération des images (avec diff pour éviter de régénérer ceux qui existent)
-            await generateImages(parsed, (territorys: Territory[]) => {
+            await generateImages(finalTerritories, (territorys: Territory[]) => {
               setTerritories(territorys)
               // Mettre à jour les territoires après génération
               updateTerritories(territorys)
@@ -192,7 +219,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
 
       }
     })()
-  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend])
+  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend, cache?.territories])
 
   useEffect(() => {
     const handleResize = () => {

@@ -1,7 +1,7 @@
 import { type FC, useEffect, useState } from 'react'
 import Wrapper from '#/ui/Wrapper'
 import { useTranslation } from 'react-i18next'
-import { handleGpxDownload } from '&/useFile'
+import { handleGpxDownload, makeGpx } from '&/useFile'
 import MapCard from '@/components/modules/MapCard'
 import Input from '@/components/ui/Input'
 import { Search } from 'lucide-react'
@@ -10,11 +10,12 @@ import { useNavigate } from 'react-router'
 
 const Territories: FC = () => {
   const { t } = useTranslation()
-  const { cache, updateTerritories } = useApiTerritory()
+  const { cache, updateTerritories, updateGpx } = useApiTerritory()
   const navigate = useNavigate()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
-    useEffect(() => {
+  
+  useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
     } else {
@@ -22,10 +23,20 @@ const Territories: FC = () => {
     }
   }, [cache, navigate])
 
-  const handleRename = (num: string, name: string) => {
+  const handleRename = async (num: string, name: string) => {
+    // Mise à jour locale immédiate pour la réactivité de l'UI
     const updatedTerritorys = territorys.map(t => t.num === num ? { ...t, name } : t)
     setTerritorys(updatedTerritorys)
     updateTerritories(updatedTerritorys)
+
+    // Régénérer le GPX avec le nouveau nom et le sauvegarder en base
+    try {
+      const newGpx = makeGpx(updatedTerritorys)
+      updateGpx(newGpx) // Ceci déclenche automatiquement la sauvegarde en base
+      console.log(`✅ Nom du territoire ${num} sauvegardé en base: "${name}"`)
+    } catch (error) {
+      console.error(`❌ Erreur lors de la sauvegarde du GPX après renommage du territoire ${num}:`, error)
+    }
   }
 
   return (

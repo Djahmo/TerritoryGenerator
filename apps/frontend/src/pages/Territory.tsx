@@ -12,12 +12,13 @@ import Modal from "#/ui/Modal"
 import type { PaintLayer } from "%/types"
 import { toast } from "sonner"
 import { ApiTerritoryService } from "@/services/apiTerritoryService"
+import { makeGpx } from "&/useFile"
 
 const Territory = () => {
   const { num } = useParams<{ num: string }>()
   const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { cache, updateTerritories, updateTerritory, saveTerritoryStandard, saveTerritoryLarge } = useApiTerritory()
+  const { cache, updateTerritories, updateTerritory, updateGpx, saveTerritoryStandard, saveTerritoryLarge } = useApiTerritory()
   const { generateThumbnailFromImage, generateLargeImage, generateLargeImageWithCrop, generateStandardImage } = useApiGenerate()
   const navigate = useNavigate()
   const territory = cache?.territories?.find((t: any) => t.num === num)
@@ -61,11 +62,22 @@ const Territory = () => {
       setInputName(territory.name);
     }
   }, [territory])
+  const handleRename = async () => {
+    if (!cache?.territories) return;
+    
+    // Mise à jour locale immédiate pour la réactivité de l'UI
+    const updatedTerritorys = cache.territories.map((t: any) => t.num === num ? { ...t, name: inputName } : t)
+    updateTerritories(updatedTerritorys)
 
-  const handleRename = () => {
-    const updatedTerritorys = cache?.territories.map((t: any) => t.num === num ? { ...t, name: inputName } : t)
-    if (updatedTerritorys) updateTerritories(updatedTerritorys)
-  }; const handleToggleLarge = async () => {
+    // Régénérer le GPX avec le nouveau nom et le sauvegarder en base
+    try {
+      const newGpx = makeGpx(updatedTerritorys)
+      updateGpx(newGpx) // Ceci déclenche automatiquement la sauvegarde en base
+      console.log(`✅ Nom du territoire ${num} sauvegardé en base: "${inputName}"`)
+    } catch (error) {
+      console.error(`❌ Erreur lors de la sauvegarde du GPX après renommage du territoire ${num}:`, error)
+    }
+  };const handleToggleLarge = async () => {
     if (!territory) return;
 
     console.log(`🔄 handleToggleLarge appelé - État actuel: isLarge=${isLarge}, territoire=${territory.num}`);
