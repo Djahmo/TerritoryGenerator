@@ -12,10 +12,6 @@ import {
   getTerritoryData,
   getReconstructedTerritories,
   createTerritoryLayer,
-  getTerritoryLayersByUser,
-  getTerritoryLayer,
-  updateTerritoryLayer,
-  deleteTerritoryLayer,
   deleteTerritoryLayersByTerritory,
   getImageFileName,
   getImageFilePath
@@ -565,6 +561,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       })
     }
   })  // Route pour sauvegarder les données de territoire (GPX, etc.)
+
   app.post('/data', async (request, reply) => {
     const user = await getAuthUser(request)
     if (!user) {
@@ -596,6 +593,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       })
     }
   })
+
   // Route pour récupérer les données de territoire
   app.get('/data', async (request, reply) => {
     const user = await getAuthUser(request)
@@ -623,6 +621,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       })
     }
   })
+
   // Route pour récupérer les territoires reconstruits à partir du GPX
   app.get('/territories', async (request, reply) => {
     const user = await getAuthUser(request)
@@ -1019,6 +1018,4 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
       })
     }
   })
-
-  // ...existing code...
 }

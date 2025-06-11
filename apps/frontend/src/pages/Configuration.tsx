@@ -6,7 +6,7 @@ import Input from '#/ui/Input'
 import { Slider, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/ui/shadcn'
 import SeparatorX from '#/ui/SeparatorX'
 import { useApiConfig } from '@/hooks/useApiConfig'
-import { Download, Upload, RotateCcw } from 'lucide-react'
+import { Download, Upload, RotateCcw, Github, Mail } from 'lucide-react'
 import Picker from '#/modules/paint/components/Picker'
 import Auth from '@/components/modules/auth/Auth'
 
@@ -442,11 +442,36 @@ const Configuration = () => {
                   onChange={(e) => setConfigProperty('ignApiCRS', e.target.value)}
                   placeholder="EPSG:3857"
                 />
-              </div>
-            </div>
+              </div>            </div>
           </div>
         </div>
-      </div>
+      </div>      {/* Footer */}
+      <footer className="py-3 border-t border-muted/20">
+        <div className="flex items-center justify-between text-sm text-muted">
+          <div></div>
+          <div className="text-center">
+            <p>&copy; 2025 Territory Generator - Tous droits réservés</p>
+          </div>
+          <div className="flex items-center gap-3 mr-4">
+            <a
+              href="https://github.com/Djahmo/TerritoryGenerator"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-positive transition-colors"
+              title="Code source"
+            >
+              <Github size={30} />
+            </a>
+            <a
+              href="mailto:contact@djahmo.fr"
+              className="hover:text-positive transition-colors"
+              title="Contact"
+            >
+              <Mail size={30} />
+            </a>
+          </div>
+        </div>
+      </footer>
     </Wrapper>
   )
 }

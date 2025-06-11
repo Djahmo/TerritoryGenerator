@@ -141,7 +141,6 @@ const Territory = () => {
           large: compositeImage, // Image composite avec annotations
         });
 
-        // Sauvegarde explicite côté serveur (QUE les données large)
         await saveTerritoryLarge(num!);
       } else {
         const miniature = await generateThumbnailFromImage(compositeImage);

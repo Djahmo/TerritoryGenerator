@@ -1,34 +1,64 @@
-# Territory Generator
+# Territor### 👤 G### 📁 Import et gestion de données
+- **Support CSV/GPX** : Import de fichiers de territoires
+- **Cache local** : Sauvegarde hors ligne
+- **Export GPX** : Génération de fichiers GPX
+- **Vue cartographique** : Aperçu des territoires sur OpenStreetMapn des utilisateurs
+- **Connexion/inscription** : Authentification avec JWT
+- **Données personnelles** : Chaque utilisateur a ses propres territoires
+- **Sauvegarde** : Synchronisation entre appareilsnerator
 
-Une application web moderne pour la génération et l'annotation de cartes de territoires à partir de données GPS. L'application permet de charger des territoires depuis des fichiers CSV/GPX, de générer automatiquement des images de cartes haute qualité via l'API IGN, et d'annoter ces cartes avec un éditeur de dessin intégré.
+Une application web moderne et complète pour la génération, l'annotation et la gestion de cartes de territoires à partir de données GPS. L'application permet de charger des territoires depuis des fichiers CSV/GPX, de générer automatiquement des images de cartes haute qualité via l'API IGN, et d'annoter ces cartes avec un éditeur de dessin intégré.
+
+🌐 **[Accéder à l'application en ligne](https://territory.djahmo.fr)**
 
 ![Territory Generator](apps/frontend/public/images/logo.clear.png)
 
 ## ✨ Fonctionnalités principales
 
-### 📁 Import de données
+### � Gestion des utilisateurs
+- **Authentification sécurisée** : Système de connexion/inscription avec JWT
+- **Données personnelles** : Chaque utilisateur a ses propres territoires et configurations
+- **Sauvegarde cloud** : Synchronisation automatique entre appareils
+
+### �📁 Import et gestion de données
 - **Support CSV/GPX** : Import de fichiers de territoires avec parsing automatique
-- **Cache IndexedDB** : Sauvegarde locale des territoires pour une utilisation hors ligne
+- **Cache local** : Sauvegarde hors ligne
 - **Export GPX** : Génération de fichiers GPX à partir des données importées
+- **Visualisation cartographique** : Aperçu interactif des territoires sur carte OpenStreetMap
 
 ### 🗺️ Génération de cartes
-- **API IGN** : Génération d'images haute résolution via l'API WMS IGN
-- **Optimisation automatique** : Calcul d'orientation optimale pour maximiser l'utilisation de l'espace
-- **Formats multiples** : Images standard et plans larges disponibles
-- **Miniatures** : Génération automatique de vignettes pour l'aperçu
+- **API IGN** : Images haute résolution via l'API française IGN
+- **Deux formats** :
+  - **Plan serré** : Vue proche du territoire
+  - **Plan large** : Vue étendue avec plus de contexte
+- **Optimisation** : Orientation automatique portrait/paysage
+- **Recadrage** : Outil pour ajuster la zone d'affichage
+- **Miniatures** : Vignettes pour aperçu rapide
 
-### 🎨 Éditeur de dessin intégré
-- **Outils de dessin** : Pinceau, formes géométriques (rectangle, cercle, ligne, flèche)
+### 🎨 Éditeur de dessin
+- **Outils de base** : Pinceau, ligne, flèche, rectangle, cercle
 - **Outils de texte** : Ajout d'annotations textuelles
-- **Symboles spéciaux** : Icônes de parking et autres symboles utiles
-- **Palette de couleurs** : Palette personnalisable avec gestion des couleurs
-- **Historique** : Annuler/Refaire avec gestion complète de l'historique
-- **Export** : Sauvegarde des annotations directement sur les images
+- **Symboles** : Parking (P) et rose des vents
+- **Gestion par couches** : Visibilité et verrouillage des éléments
+- **Palette de couleurs** : Choix et sauvegarde des couleurs
+- **Historique** : Annuler/Refaire
+- **Sauvegarde automatique** : Toutes les modifications sont sauvegardées
+
+### 📄 Exportation et impression
+- **Aperçu avant impression** : Prévisualisation des documents
+- **Impression par lot** : Plusieurs territoires en une fois
+- **Export ZIP** : Téléchargement de toutes les images
+- **Recherche** : Filtrage des territoires
+
+### ⚙️ Configuration
+- **DPI ajustable** : 150-300 DPI (250 par défaut)
+- **Ratios prédéfinis** : Papier, écran 16:9, carré, personnalisé
+- **Couleurs** : Contour et épaisseur personnalisables
+- **Import/Export** : Sauvegarde des configurations
 
 ### 🌍 Internationalisation
-- **Support multilingue** : Français et Anglais intégrés
-- **Détection automatique** : Langue détectée automatiquement selon le navigateur
-- **Interface adaptative** : Traductions complètes de l'interface utilisateur
+- **Français et Anglais** : Interface multilingue
+- **Détection automatique** : Selon les préférences du navigateur
 
 ## 🏗️ Architecture technique
 
@@ -37,24 +67,51 @@ Une application web moderne pour la génération et l'annotation de cartes de te
 - **Styling** : UnoCSS avec thèmes sombre/clair
 - **State Management** : Zustand + hooks personnalisés
 - **Routing** : React Router v7
-- **Backend** : Fastify (architecture modulaire)
+- **Backend** : Fastify + Drizzle ORM + MySQL
+- **Authentification** : JWT avec sécurisation des routes
 - **Build** : Turbo (monorepo)
+- **Cartographie** : Leaflet + OpenStreetMap
 
 ### Structure du projet
 ```
 TerritoryGenerator/
 ├── apps/
 │   ├── frontend/          # Application React
+│   │   ├── src/
+│   │   │   ├── components/    # Composants réutilisables
+│   │   │   ├── hooks/         # Hooks personnalisés
+│   │   │   ├── pages/         # Pages de l'application
+│   │   │   ├── services/      # Services API
+│   │   │   └── utils/         # Utilitaires
+│   │   └── public/           # Assets publics
 │   └── backend/           # API Fastify
+│       ├── src/
+│       │   ├── db/           # Gestion base de données
+│       │   ├── routes/       # Routes API
+│       │   ├── services/     # Services métier
+│       │   ├── schema/       # Schémas base de données
+│       │   └── utils/        # Utilitaires backend
+│       └── public/          # Images générées
 ├── package.json           # Configuration workspace
 └── turbo.json            # Configuration Turbo
 ```
 
+### Base de données
+- **ORM** : Drizzle avec migrations automatiques
+- **Tables principales** :
+  - `users` : Gestion des utilisateurs
+  - `territories_data` : Données GPX des territoires
+  - `territory_images` : Images générées avec métadonnées
+  - `territory_layers` : Couches d'annotations
+  - `user_config` : Configurations personnalisées
+
 ### Fonctionnalités avancées
 - **Canvas haute performance** : Rendu optimisé avec HTMLCanvas et ImageBitmap
 - **Queue de requêtes** : Gestion intelligente des appels API avec retry et rate limiting
-- **Cache intelligent** : Système de cache multi-niveaux (mémoire + IndexedDB)
-- **PWA Ready** : Headers CORS configurés pour fonctionnement hors ligne
+- **Cache multi-niveaux** : Mémoire + serveur
+- **Architecture modulaire** : Services découplés et testables
+- **Sécurité renforcée** : Validation des données, CORS, CSP
+- **PWA Ready** : Fonctionnement hors ligne partiel
 
 ## 🚀 Installation et développement
 
@@ -71,94 +128,136 @@ cd TerritoryGenerator
 # Installation des dépendances
 npm install
 
+# Configuration de la base de données
+npm run drizzle:push
+
 # Lancement en mode développement
-npm run dev
+npm run dev          # Frontend (port 5173)
+npm run devapi       # Backend (port 3002)
 ```
 
-L'application sera accessible sur `http://localhost:5173`
+Le frontend sera accessible sur `http://localhost:5173` et l'API sur `http://localhost:3002`
 
 ### Configuration
-L'application utilise l'API IGN publique par défaut. Les paramètres de configuration sont disponibles dans :
-- `apps/frontend/src/utils/constants.ts` - Configuration générale
-- `apps/frontend/src/hooks/useConfig.ts` - Configuration utilisateur
+L'application nécessite quelques variables d'environnement pour le backend :
+- Configuration de la base de données (MySQL)
+- Clés JWT pour l'authentification
+- URL de l'API IGN (configurée par défaut)
+
+Les paramètres de configuration sont disponibles dans :
+- `apps/frontend/src/utils/constants.ts` - Configuration générale frontend
+- `apps/backend/src/env.ts` - Configuration backend
+- Interface utilisateur dans l'application pour la configuration personnalisée
 
 ## 📖 Guide d'utilisation
 
-### 1. Import de territoires
+### 1. Créer un compte
+1. Accédez à [l'application](https://territory.djahmo.fr)
+2. Créez un compte ou connectez-vous
+3. Votre espace personnel est maintenant accessible
+
+### 2. Import de territoires
 1. Préparez un fichier CSV ou GPX contenant les données de territoires
 2. Utilisez le bouton de téléchargement sur la page d'accueil
-3. Les territoires sont automatiquement parsés et affichés
+3. Les territoires sont automatiquement parsés et affichés sur la carte
+4. Vos données sont sauvegardées sur votre compte
 
-### 2. Génération de cartes
+### 3. Génération de cartes
 1. Après l'import, les images sont générées automatiquement
-2. Chaque territoire dispose d'une miniature et d'une image haute résolution
-3. Les cartes sont optimisées pour impression A4
+2. Chaque territoire dispose de :
+   - Une **miniature** pour l'aperçu
+   - Un **plan serré** optimisé pour le territoire
+   - Un **plan large** (généré à la demande) avec plus de contexte
+3. Utilisez l'outil de recadrage pour ajuster la zone d'affichage
+4. Les cartes sont optimisées pour impression A4
 
-### 3. Annotation des cartes
+### 4. Annotation des cartes
 1. Cliquez sur une carte pour accéder à l'éditeur
 2. Utilisez la barre d'outils pour sélectionner un outil de dessin
 3. Ajoutez vos annotations (texte, formes, symboles)
-4. Les modifications sont sauvegardées automatiquement
+4. Gérez vos annotations par couches (visibilité, verrouillage)
+5. Les modifications sont sauvegardées automatiquement
 
-## 🔧 Configuration avancée
+### 5. Exportation et impression
+1. Accédez à la page "Exportation"
+2. Prévisualisez vos territoires avant impression
+3. Imprimez individuellement ou par lot
+4. Exportez toutes les images en archive ZIP
+
+## 🔧 Configuration
 
 ### Paramètres d'impression
-- **PPP** : 250 DPI par défaut (modifiable)
+- **DPI** : 150-300 DPI (250 par défaut)
 - **Format** : A4 (29.7cm de large)
-- **Ratio** : 1.41:1 par défaut
+- **Ratios** : Papier paysage/portrait, écran 16:9, carré, personnalisé
 
 ### API IGN
-- **Endpoint** : `https://data.geopf.fr/wms-r`
-- **Layer** : `GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2`
+- **Source** : Géoportail français (`data.geopf.fr`)
+- **Couche** : Plan IGN v2
 - **Format** : PNG avec transparence
-- **Projection** : EPSG:4326 (WGS84)
+- **Projection** : WGS84
 
 ### Personnalisation
-```typescript
-// Configuration dans useConfig.ts
-const defaultConfig: Config = {
-  ppp: 250,           // Points par pouce
-  paperWidth: 29.7,   // Largeur papier en cm
-  ratioX: 1.41,       // Ratio largeur
-  ratioY: 1,          // Ratio hauteur
-  palette: [...]      // Palette de couleurs
-}
-```
+- **Couleurs** : Contour et épaisseur des territoires
+- **Palette** : Couleurs de dessin personnalisables
+- **Export/Import** : Sauvegarde des configurations
 
 ## 🛠️ Scripts disponibles
 
 ### Frontend
 ```bash
-npm run dev      # Serveur de développement
+npm run dev      # Serveur de développement (port 5173)
 npm run build    # Build de production
 npm run preview  # Aperçu du build
 npm run lint     # Vérification du code
 ```
 
-### Global
+### Backend
 ```bash
-npm run dev      # Lance le frontend en développement
+npm run devapi           # Serveur API de développement (port 3000)
+npm run drizzle:push     # Synchronisation du schéma DB
+npm run drizzle:generate # Génération des migrations
+npm run drizzle:migrate  # Application des migrations
+```
+
+### Global (depuis le workspace racine)
+```bash
+npm run dev              # Lance le frontend uniquement
+npm run devapi           # Lance le backend uniquement
+npm run build            # Build du frontend
 ```
 
 ## 🏗️ Architecture des composants
 
-### Services principaux
-- **TerritoryImageService** : Génération d'images de territoires
-- **NetworkService** : Gestion des requêtes HTTP avec retry
+### Services backend
+- **TerritoryImageService** : Génération d'images via API IGN
+- **AuthService** : Authentification JWT
+- **DatabaseService** : Opérations avec Drizzle ORM
+
+### Services frontend
+- **ApiTerritoryService** : Communication avec l'API
+- **NetworkService** : Gestion des requêtes HTTP
 - **ThumbnailService** : Création de miniatures
-- **ApiQueue** : File d'attente pour les requêtes API
 
-### Hooks personnalisés
-- **useConfig** : Gestion de la configuration utilisateur
-- **useGenerate** : Génération d'images en batch
-- **useFile** : Lecture et parsing de fichiers
-- **useTerritoryCache** : Cache des territoires avec IndexedDB
+### Hooks
+- **useApiTerritory** : Gestion des territoires
+- **useApiConfig** : Configuration utilisateur
+- **useApiGenerate** : Génération d'images
+- **useApiAuth** : Authentification
 
-### Composants Paint
-- **Paint** : Composant principal de l'éditeur
-- **ToolBar** : Barre d'outils avec sélection d'outils
-- **ColorPicker** : Sélecteur de couleurs avancé
-- **ActionButtons** : Boutons d'action (annuler, refaire, etc.)
+### Pages
+- **AllTerritory** : Vue cartographique
+- **Territories** : Galerie des territoires
+- **Territory** : Éditeur de territoire
+- **Exportation** : Impression et export
+- **Configuration** : Paramètres
+
+### Éditeur de dessin
+- **Paint** : Composant principal
+- **ToolBar** : Barre d'outils
+- **ColorPicker** : Sélecteur de couleurs
+- **ActionButtons** : Annuler, refaire, etc.
+- **LayerManager** : Gestion des couches
 
 ## 🎨 Système de thèmes
 
@@ -176,16 +275,17 @@ L'application supporte les thèmes sombre et clair avec une palette de couleurs 
 
 ## 🔒 Sécurité et performance
 
-### Optimisations
-- **Image Processing** : Utilisation d'ImageBitmap pour les performances
-- **Canvas Offscreen** : Rendu en arrière-plan quand possible
-- **Rate Limiting** : Respect des limites de l'API IGN (40 req/s max)
-- **Memory Management** : Nettoyage automatique des ressources canvas
-
 ### Sécurité
-- **CORS** : Headers configurés pour le fonctionnement cross-origin
-- **CSP** : Content Security Policy adaptée aux canvas
-- **Validation** : Validation des données d'entrée (CSV/GPX)
+- **Authentification JWT** : Tokens avec expiration
+- **Validation des données** : Contrôle des entrées
+- **Isolation utilisateur** : Données séparées par utilisateur
+- **CORS** : Headers sécurisés
+
+### Performance
+- **Cache intelligent** : Réutilisation des images
+- **Canvas optimisé** : Rendu avec HTMLCanvas
+- **Rate Limiting** : Respect des limites API IGN (40 req/s)
+- **Compression** : WebP pour miniatures, PNG pour qualité
 
 ## 🤝 Contribution
 
@@ -243,6 +343,18 @@ TerritoryID,CategoryCode,Category,Number,Suffix,Area,Type,Link1,Link2,CustomNote
 </gpx>
 ```
 
+### API Endpoints principaux
+```
+POST /api/auth/login          # Connexion utilisateur
+POST /api/auth/register       # Inscription
+GET  /api/territories         # Liste des territoires
+POST /api/generate-image      # Génération d'image
+POST /api/territory-complete  # Sauvegarde complète
+GET  /api/user-config         # Configuration utilisateur
+```
+
 ---
 
-**Territory Generator** - Génération et annotation de cartes de territoires simplifiée 🗺️✨
+**Territory Generator** - Plateforme complète de génération et annotation de cartes de territoires 🗺️✨
+
+🌐 **[Essayez l'application maintenant](https://territory.djahmo.fr)**
