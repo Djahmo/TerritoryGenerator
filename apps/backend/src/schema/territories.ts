@@ -1,4 +1,4 @@
-import { mysqlTable, timestamp, varchar, text, int, float, boolean } from 'drizzle-orm/mysql-core'
+import { mysqlTable, timestamp, varchar, text, longtext, int, float, boolean } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
 import { users } from './users.js'
 
@@ -33,7 +33,7 @@ export const layers = mysqlTable('layers', {
 
 export const territories = mysqlTable('territories', {
   userId: varchar('userId', { length: 21 }).primaryKey().references(() => users.id),
-  data: text('data').notNull(),
+  data: longtext('data').notNull(),
   createdAt: timestamp('createdAt').default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp('updatedAt').default(sql`CURRENT_TIMESTAMP`).onUpdateNow()
 })

@@ -1,4 +1,4 @@
-import { mysqlTable, timestamp, varchar, text, boolean, datetime, int, float, decimal } from 'drizzle-orm/mysql-core'
+import { mysqlTable, timestamp, varchar, text, longtext, boolean, datetime, int, float, decimal } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
 
 export const users = mysqlTable('users', {
@@ -60,7 +60,7 @@ export const layers = mysqlTable('layers', {
 
 export const territories = mysqlTable('territories', {
   userId: varchar('userId', { length: 21 }).primaryKey().references(() => users.id),
-  data: text('data').notNull(), // Contient les données GPX
+  data: longtext('data').notNull(), // Contient les données GPX
   createdAt: timestamp('createdAt').default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp('updatedAt').default(sql`CURRENT_TIMESTAMP`).onUpdateNow()
 })
