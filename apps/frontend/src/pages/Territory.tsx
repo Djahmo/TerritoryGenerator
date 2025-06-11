@@ -164,11 +164,11 @@ const Territory = () => {
   }
     const handleRegenerate = async () => {
     if (!territory) return;
-    
+
     // Fermer le modal immédiatement pour voir le loading
     setShowConfirmation(false);
     setIsRegenerating(true);
-    
+
     try {
       if (isLarge) {
         const success = await generateLargeImage(territory); if (success) {

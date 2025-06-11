@@ -263,15 +263,15 @@ export class TerritoryImageService {
     const bboxWidth = maxLon - minLon
     const bboxHeight = maxLat - minLat
     const bboxRatio = bboxWidth / bboxHeight
-    
+
     // UTILISER LES DIMENSIONS EXACTES DE LA CONFIG LARGE
     const configWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth
     const configHeight = this.dimensions.largeFinalHeight || this.dimensions.finalHeight
     const configRatio = configWidth / configHeight
-    
+
     let finalWidth: number
     let finalHeight: number
-    
+
     // Si le ratio du bbox correspond au ratio de la config → orientation normale
     // Si le ratio du bbox correspond au ratio inversé de la config → orientation inversée
     if (Math.abs(bboxRatio - configRatio) < Math.abs(bboxRatio - (1/configRatio))) {
@@ -287,7 +287,7 @@ export class TerritoryImageService {
     const marginFactor = this.PHI // Utiliser PHI directement comme dans calculateBoundingBox
     const lonMargin = bboxWidth * marginFactor
     const latMargin = bboxHeight * marginFactor
-    
+
     const expandedBbox: [number, number, number, number] = [
       minLon - lonMargin,
       minLat - latMargin,
@@ -319,7 +319,7 @@ export class TerritoryImageService {
     // Calculer les coordonnées du crop dans l'image étendue
     const expandedWidth = expandedBbox[2] - expandedBbox[0]
     const expandedHeight = expandedBbox[3] - expandedBbox[1]
-    
+
     // Position du bbox final dans l'image étendue
     const cropX = ((minLon - expandedBbox[0]) / expandedWidth) * rawSize
     const cropY = ((expandedBbox[3] - maxLat) / expandedHeight) * rawSize

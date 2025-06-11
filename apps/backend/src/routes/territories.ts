@@ -332,7 +332,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
     }    try {      const { territory, customBbox, cropData, options = {} } = parse.data
       const userId = user.id
       let finalBbox = customBbox
-      
+
       if (cropData) {
         // Récupérer l'image originalLarge existante pour connaître son bbox
         const existingImage = await getTerritoryImage(userId, territory.num, 'originalLarge')
@@ -343,12 +343,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
           const [minLon, minLat, maxLon, maxLat] = currentBbox
           const bboxWidth = maxLon - minLon
           const bboxHeight = maxLat - minLat
-          
+
           // Calculer le nouveau bbox basé sur les coordonnées de crop
           // Les coordonnées de crop sont normalisées (0-1) par rapport à l'image affichée
           const newMinLon = minLon + (cropData.x * bboxWidth)
           const newMaxLon = minLon + ((cropData.x + cropData.width) * bboxWidth)
-          
+
           // Pour les coordonnées Y, attention à l'inversion :
           // Dans l'image : Y=0 en haut, Y=1 en bas
           // Dans les coordonnées géo : minLat=bas, maxLat=haut
