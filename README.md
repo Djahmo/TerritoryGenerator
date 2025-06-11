@@ -1,4 +1,6 @@
-# Territor### 👤 G### 📁 Import et gestion de données
+# Territory Generator
+
+### 📁 Import et gestion de données
 - **Support CSV/GPX** : Import de fichiers de territoires
 - **Cache local** : Sauvegarde hors ligne
 - **Export GPX** : Génération de fichiers GPX
