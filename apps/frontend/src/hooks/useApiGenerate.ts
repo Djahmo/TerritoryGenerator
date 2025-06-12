@@ -18,19 +18,47 @@ export const useApiGenerate = () => {
     setLoading(true)
     setError(null)
 
-    // Si on a des territoires existants, faire un diff pour ne traiter que les nouveaux
+    // 🎯 NOUVEAU: Vérifier en BDD quels territoires ont déjà des images générées
     let territoriesToGenerate = territories;
-    if (existingTerritories && existingTerritories.length > 0) {
-      const existingNums = new Set(existingTerritories.map(t => t.num));
-      territoriesToGenerate = territories.filter(t => !existingNums.has(t.num));
+    
+    try {
+      console.log('🔍 Vérification des territoires existants en base de données...')
+      
+      // Récupérer tous les territoires existants avec leurs images depuis la DB
+      const dbTerritories = await apiService.getTerritories()
+      console.log(`📊 Territoires trouvés en DB: ${dbTerritories.length}`)
+      
+      if (dbTerritories.length > 0) {        // Créer un Set des numéros de territoires qui ont déjà une image standard ET une miniature
+        const territoriesWithImages = new Set(
+          dbTerritories
+            .filter(t => t.image && t.miniature) // Territoire avec image standard ET miniature
+            .map(t => t.num)
+        )
+        
+        console.log(`✅ Territoires avec images existantes: [${Array.from(territoriesWithImages).join(', ')}]`)
+        
+        // Filtrer pour ne générer QUE les territoires sans images
+        territoriesToGenerate = territories.filter(t => !territoriesWithImages.has(t.num))
+        
+        console.log(`🎯 Territoires à générer: [${territoriesToGenerate.map(t => t.num).join(', ')}]`)
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de la vérification DB, génération de tous les territoires:', error)
+      // En cas d'erreur, continuer avec la logique existante
+      if (existingTerritories && existingTerritories.length > 0) {
+        const existingNums = new Set(existingTerritories.map(t => t.num));
+        territoriesToGenerate = territories.filter(t => !existingNums.has(t.num));
+      }
     }
 
     // Si aucun nouveau territoire, on évite la génération
     if (territoriesToGenerate.length === 0) {
+      console.log('✅ Tous les territoires ont déjà des images, pas de génération nécessaire')
       setLoading(false);
       return;
     }
 
+    console.log(`🚀 Démarrage de la génération pour ${territoriesToGenerate.length} territoires`)
     setProgress({ current: 0, total: territoriesToGenerate.length })
 
     // Créer un nouveau AbortController pour cette génération

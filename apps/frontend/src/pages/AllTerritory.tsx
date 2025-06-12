@@ -201,13 +201,11 @@ const AllTerritory: React.FC = () => {
             await apiService.saveTerritoryData(gpxData)
 
             // Mise à jour des données locales immédiatement
-            updateGpx(gpxData)
-
-            // Génération des images (avec diff pour éviter de régénérer ceux qui existent)
+            updateGpx(gpxData)            // Génération des images (avec vérification automatique en DB)
             await generateImages(finalTerritories, (territorys: Territory[]) => {
               // Mettre à jour les territoires après génération
               updateTerritories(territorys)
-            }, cache?.territories) // Passer les territoires existants pour le diff
+            }) // Plus besoin de passer cache?.territories car la vérification se fait en DB
 
             // IMPORTANT: Recharger depuis le backend pour récupérer
             // les territoires avec les layers et images associés
@@ -223,7 +221,7 @@ const AllTerritory: React.FC = () => {
         }
       }
     })()
-  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend, cache?.territories])
+  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend]) // Retirer cache?.territories des deps
 
   useEffect(() => {
     const handleResize = () => {
