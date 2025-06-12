@@ -100,20 +100,32 @@ const updateLayerSchema = z.object({
   layerData: z.string().optional(),
 })
 
-export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pour générer une image de territoire
+export const registerTerritoryRoutes = (app: FastifyInstance) => {
+  // Route pour générer une image de territoire
   app.post('/generate-image', async (request, reply) => {
     const user = await getAuthUser(request)
     if (!user) {
-      return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
+      return reply.status(401).send({ success: false, error: 'api.error.auth.unauthorized' })
     }
 
     const parse = generateImageSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
-    } try {
+      return reply.status(400).send({ success: false, errors: parse.error.errors })
+    }
+
+    try {
       const { territory, imageType, options = {} } = parse.data
       const userId = user.id
 
+      // Validation des données d'entrée
+      if (!territory || !territory.num) {
+        return reply.status(400).send({ 
+          success: false, 
+          error: 'Données de territoire invalides' 
+        })
+      }
+
+      console.log(`🚀 Génération d'image ${imageType} pour le territoire ${territory.num}`)
 
       // Récupérer la configuration utilisateur de la base de données
       const userConfig = await getUserConfig(userId)
@@ -300,15 +312,14 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {  // Route pou
             }
             await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
-        }
-
-        return reply.send({ success: true });
+        }        return reply.send({ success: true });
       } else {
-        return reply.status(400).send({ error: 'Type d\'image non supporté' })
+        return reply.status(400).send({ success: false, error: 'Type d\'image non supporté' })
       }
     } catch (error) {
-      console.error(error)
+      console.error(`❌ Erreur lors de la génération pour le territoire ${parse.data?.territory?.num}:`, error)
       return reply.status(500).send({
+        success: false,
         error: 'Erreur lors de la génération de l\'image',
         details: error instanceof Error ? error.message : 'Erreur inconnue'
       })

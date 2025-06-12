@@ -9,7 +9,50 @@ export const useApiGenerate = () => {
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Service API pour les territoires
-  const apiService = new ApiTerritoryService()  // Fonction principale de génération d'images via API
+  const apiService = new ApiTerritoryService()  /**
+   * Génère une image pour un territoire avec système de retry robuste
+   * Réessaie jusqu'à 10 fois en cas d'échec, sans timeout global
+   */
+  const generateImageWithRetry = useCallback(async (
+    territory: Territory,
+    maxRetries: number = 10
+  ): Promise<{ success: boolean; error?: string }> => {
+    let lastError: string = '';
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Vérifier l'annulation avant chaque tentative
+        if (abortControllerRef.current?.signal.aborted) {
+          return { success: false, error: 'Génération annulée' };
+        }
+
+        console.log(`🔄 Tentative ${attempt}/${maxRetries} pour le territoire ${territory.num}`);
+        
+        // Appel de l'API sans timeout global
+        await apiService.generateStandardImage(territory);
+        
+        console.log(`✅ Territoire ${territory.num} généré avec succès (tentative ${attempt})`);
+        return { success: true };
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : 'Erreur inconnue';
+        console.warn(`❌ Tentative ${attempt}/${maxRetries} échouée pour le territoire ${territory.num}:`, lastError);
+        
+        // Si ce n'est pas la dernière tentative, attendre un peu avant de réessayer
+        if (attempt < maxRetries && !abortControllerRef.current?.signal.aborted) {
+          // Délai progressif : 1s, 2s, 3s, etc.
+          const delay = attempt * 1000;
+          console.log(`⏳ Attente de ${delay}ms avant la prochaine tentative...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    console.error(`💥 Échec définitif pour le territoire ${territory.num} après ${maxRetries} tentatives`);
+    return { success: false, error: lastError };
+  }, []);
+
+  // Fonction principale de génération d'images via API
   const generateImages = useCallback(async (
     territories: Territory[],
     callback: (territories: Territory[]) => void,
@@ -69,54 +112,61 @@ export const useApiGenerate = () => {
       const initialTerritories: Territory[] = [...territories]
       callback([...initialTerritories])
 
-      // Compteur pour suivre les images terminées
+      // Compteur pour suivre les images terminées (réussies ET échouées)
       let completedCount = 0
+      let successCount = 0
+      let failedTerritories: string[] = []
 
-      const promises = territoriesToGenerate.map((territory, index) =>
-        new Promise<void>((resolve) => {
-          const timeoutId = setTimeout(async () => {
-            try {
-              // Vérifier si la génération a été annulée
-              if (abortControllerRef.current?.signal.aborted) {
-                resolve()
-                return
-              }
+      // Générer les territoires en parallèle avec retry
+      const promises = territoriesToGenerate.map(async (territory, index) => {
+        // Délai initial entre territoires pour éviter la surcharge
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500 * index));
+        }
 
-              await apiService.generateStandardImage(territory)
+        // Vérifier l'annulation
+        if (abortControllerRef.current?.signal.aborted) {
+          return;
+        }
 
-              if (abortControllerRef.current?.signal.aborted) {
-                resolve()
-                return
-              }
+        // Générer avec retry
+        const result = await generateImageWithRetry(territory);
+        
+        // Mettre à jour les compteurs
+        completedCount++
+        if (result.success) {
+          successCount++
+        } else {
+          failedTerritories.push(territory.num)
+        }
 
-              completedCount++
-              setProgress({ current: completedCount, total: territoriesToGenerate.length })
+        // Mettre à jour le progress
+        setProgress({ current: completedCount, total: territoriesToGenerate.length })
 
-              callback([...initialTerritories])
-            } catch (error) {
-              console.error(`Erreur lors de la génération pour le territoire ${territory.num}:`, error)
-              completedCount++
-              setProgress({ current: completedCount, total: territoriesToGenerate.length })            } finally {
-              resolve()
-            }
-          }, index * 1000) // Délai de 1 seconde entre chaque requête pour éviter la surcharge de l'API WMS
-
-          // Enregistrer le timeout pour pouvoir l'annuler si nécessaire
-          abortControllerRef.current?.signal.addEventListener('abort', () => {
-            clearTimeout(timeoutId)
-            resolve()
-          })
-        })
-      )
+        // Mettre à jour le callback
+        callback([...initialTerritories])
+      })
 
       await Promise.all(promises)
+
+      // Gestion des erreurs finales
+      if (failedTerritories.length > 0) {
+        const errorMessage = `Génération échouée pour ${failedTerritories.length} territoire(s): ${failedTerritories.join(', ')}. ${successCount} territoire(s) généré(s) avec succès.`
+        console.error(errorMessage)
+        setError(errorMessage)
+      } else {
+        console.log(`🎉 Tous les territoires ont été générés avec succès !`)
+      }
+
     } catch (error) {
-      setError(`Erreur lors de la génération: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+      const errorMessage = `Erreur lors de la génération: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+      console.error(errorMessage)
+      setError(errorMessage)
     } finally {
       setLoading(false)
       setProgress({ current: 0, total: 0 })
     }
-  }, [])
+  }, [generateImageWithRetry])
   // Fonction pour générer une image large via API
   const generateLargeImage = useCallback(async (territory: Territory): Promise<boolean> => {
     try {

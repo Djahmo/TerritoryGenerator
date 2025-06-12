@@ -62,12 +62,10 @@ export const useUser = create<UserState>()(
       partialize: (state) => ({ user: state.user }),
       // Force la vérification utilisateur au démarrage
       onRehydrateStorage: () => (state) => {
-        if (state?.user) {
-          // Si on a un utilisateur en cache, vérifier qu'il existe encore côté serveur
-          setTimeout(() => {
-            state.fetchMe()
-          }, 100)
-        }
+        // Toujours déclencher fetchMe au démarrage pour vérifier l'état d'authentification
+        setTimeout(() => {
+          state?.fetchMe()
+        }, 100)
       }
     }
   )
