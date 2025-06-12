@@ -64,7 +64,7 @@ const Territory = () => {
   }, [territory])
   const handleRename = async () => {
     if (!cache?.territories) return;
-    
+
     // Mise à jour locale immédiate pour la réactivité de l'UI
     const updatedTerritorys = cache.territories.map((t: any) => t.num === num ? { ...t, name: inputName } : t)
     updateTerritories(updatedTerritorys)

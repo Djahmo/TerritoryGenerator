@@ -14,7 +14,7 @@ const Territories: FC = () => {
   const navigate = useNavigate()
   const [search, setSearch] = useState<string>("")
   const [territorys, setTerritorys] = useState<any[]>([])
-  
+
   useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)

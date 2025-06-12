@@ -58,7 +58,8 @@ const TerritoryOverlay: React.FC<{
   )
 }
 
-const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updateTerritories, loadFromBackend } = useApiTerritory()
+const AllTerritory: React.FC = () => {
+  const { cache, loading, updateGpx, updateTerritories, loadFromBackend } = useApiTerritory()
   const { content, type, error: fileError, readFile } = useFileReader()
   const { loading: imgLoading, error: imgError, progress, generateImages } = useApiGenerate()
   const { t } = useTranslation()
@@ -68,8 +69,8 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
   const [selectedTerritory, setSelectedTerritory] = useState<Territory | null>(null)
   const [overlayPosition, setOverlayPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [mapKey, setMapKey] = useState<number>(0) // Clé pour forcer le re-render de la carte
-  const [territories, setTerritories] = useState<any[]>([])
   const [showUpload, setShowUpload] = useState<boolean>(false) // Pour afficher le téléversement
+  const [isProcessingNewFile, setIsProcessingNewFile] = useState<boolean>(false) // Pour indiquer qu'on traite un nouveau fichier
   const { config, loading: configLoading } = useApiConfig()
 
   const calculateCenter = (geoJsonData: any[]): [number, number] => {
@@ -161,25 +162,25 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
       convertGpxToGeoJSON()
     }
   }, [cache, loading])
-
   useEffect(() => {
     (async () => {
       if (content && type) {
         try {
           setError(null)
+          setIsProcessingNewFile(true) // Commencer le traitement
           const newTerritories = parse(content, type)
-          
+
           // Fusionner avec les territoires existants pour préserver les noms personnalisés
           let finalTerritories = newTerritories
-          
+
           // Si on a des territoires existants en cache, fusionner intelligemment
           if (cache?.territories?.length) {
             console.log('🔄 Fusion des territoires existants avec les nouveaux pour préserver les noms personnalisés')
-            
+
             finalTerritories = newTerritories.map(newTerritory => {
               // Chercher un territoire existant avec le même numéro
               const existingTerritory = cache.territories.find(existing => existing.num === newTerritory.num)
-              
+
               if (existingTerritory && existingTerritory.name && existingTerritory.name !== newTerritory.name) {
                 // Préserver le nom personnalisé existant
                 console.log(`📝 Préservation du nom personnalisé pour ${newTerritory.num}: "${existingTerritory.name}" (au lieu de "${newTerritory.name}")`)
@@ -188,13 +189,11 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
                   name: existingTerritory.name // Garder le nom personnalisé
                 }
               }
-              
+
               return newTerritory
             })
           }
-          
-          setTerritories(finalTerritories.sort((a, b) => a.num.localeCompare(b.num)))
-          
+
           if (finalTerritories.length) {
             const gpxData = makeGpx(finalTerritories)
 
@@ -202,21 +201,26 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
             await apiService.saveTerritoryData(gpxData)
 
             // Mise à jour des données locales immédiatement
-            updateGpx(gpxData)            // Génération des images (avec diff pour éviter de régénérer ceux qui existent)
+            updateGpx(gpxData)
+
+            // Génération des images (avec diff pour éviter de régénérer ceux qui existent)
             await generateImages(finalTerritories, (territorys: Territory[]) => {
-              setTerritories(territorys)
               // Mettre à jour les territoires après génération
               updateTerritories(territorys)
-            }, cache?.territories) // Passer les territoires existants pour le diff// IMPORTANT: Recharger depuis le backend pour récupérer
+            }, cache?.territories) // Passer les territoires existants pour le diff
+
+            // IMPORTANT: Recharger depuis le backend pour récupérer
             // les territoires avec les layers et images associés
             await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre un peu
             await loadFromBackend()
+            
+            setIsProcessingNewFile(false) // Terminer le traitement
           }
         } catch (error) {
           console.error('❌ Erreur lors du traitement du fichier:', error)
           setError(`Erreur lors du traitement du fichier: ${error}`)
+          setIsProcessingNewFile(false) // Terminer le traitement même en cas d'erreur
         }
-
       }
     })()
   }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend, cache?.territories])
@@ -243,7 +247,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
       setSelectedTerritory(territory)
     })
   }
-  if (loading || imgLoading || configLoading) {
+  if (loading || imgLoading || configLoading || isProcessingNewFile) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -303,7 +307,7 @@ const AllTerritory: React.FC = () => {  const { cache, loading, updateGpx, updat
       </div>
     )
   }
-  if (territoriesGeoJSON.length === 0 && !territories.length) {
+  if (territoriesGeoJSON.length === 0) {
     return (
       <div className="h-screen w-full relative">
         <div className="bg-lightnd dark:bg-darknd border-b border-gray-200 px-4 py-3">
