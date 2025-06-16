@@ -119,9 +119,9 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
       // Validation des données d'entrée
       if (!territory || !territory.num) {
-        return reply.status(400).send({ 
-          success: false, 
-          error: 'Données de territoire invalides' 
+        return reply.status(400).send({
+          success: false,
+          error: 'Données de territoire invalides'
         })
       }
 

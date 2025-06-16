@@ -211,7 +211,7 @@ const AllTerritory: React.FC = () => {
             // les territoires avec les layers et images associés
             await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre un peu
             await loadFromBackend()
-            
+
             setIsProcessingNewFile(false) // Terminer le traitement
           }
         } catch (error) {

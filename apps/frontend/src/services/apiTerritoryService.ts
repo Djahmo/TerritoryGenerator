@@ -16,7 +16,7 @@ export class ApiTerritoryService {
    */
   private async fetchWithoutTimeout(url: string, options: RequestInit = {}): Promise<Response> {
     const controller = new AbortController()
-    
+
     const fetchOptions: RequestInit = {
       ...options,
       signal: controller.signal,
@@ -25,12 +25,12 @@ export class ApiTerritoryService {
 
     try {
       const response = await fetch(url, fetchOptions)
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || `Erreur HTTP ${response.status}`)
       }
-      
+
       return response
     } catch (error) {
       // Ne pas masquer les erreurs de réseau ou les erreurs d'API
@@ -61,7 +61,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès - ne jamais assumer un succès
     if (result.success !== true) {
       throw new Error(result.error || 'Génération échouée côté serveur')
@@ -88,7 +88,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès
     if (result.success !== true) {
       throw new Error(result.error || 'Génération large échouée côté serveur')
@@ -125,7 +125,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès
     if (result.success !== true) {
       throw new Error(result.error || 'Génération avec crop échouée côté serveur')
@@ -233,7 +233,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès
     if (result.success !== true) {
       throw new Error(result.error || 'Mise à jour complète échouée côté serveur')
@@ -270,7 +270,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès
     if (result.success !== true) {
       throw new Error(result.error || 'Sauvegarde standard échouée côté serveur')
@@ -306,7 +306,7 @@ export class ApiTerritoryService {
     })
 
     const result = await response.json()
-    
+
     // Vérifier explicitement le succès
     if (result.success !== true) {
       throw new Error(result.error || 'Sauvegarde large échouée côté serveur')

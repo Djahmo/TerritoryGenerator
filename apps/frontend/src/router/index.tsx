@@ -15,45 +15,45 @@ const router = createBrowserRouter([
     path: '/',
     element: <MainLayout />,
     children: [
-      { 
-        index: true, 
+      {
+        index: true,
         element: (
           <ProtectedRoute>
             <AllTerritory />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'territory/:num', 
+      {
+        path: 'territory/:num',
         element: (
           <ProtectedRoute>
             <Territory />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'configuration', 
+      {
+        path: 'configuration',
         element: (
           <ProtectedRoute allowAnonymous={true}>
             <Configuration />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'territories', 
+      {
+        path: 'territories',
         element: (
           <ProtectedRoute>
             <Territories />
           </ProtectedRoute>
-        ) 
+        )
       },
-      { 
-        path: 'exportation', 
+      {
+        path: 'exportation',
         element: (
           <ProtectedRoute>
             <Exportation />
           </ProtectedRoute>
-        ) 
+        )
       },
       { path: '*', element: <NotFound /> },
     ],

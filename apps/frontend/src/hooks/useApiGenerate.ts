@@ -18,7 +18,7 @@ export const useApiGenerate = () => {
     maxRetries: number = 10
   ): Promise<{ success: boolean; error?: string }> => {
     let lastError: string = '';
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Vérifier l'annulation avant chaque tentative
@@ -27,17 +27,17 @@ export const useApiGenerate = () => {
         }
 
         console.log(`🔄 Tentative ${attempt}/${maxRetries} pour le territoire ${territory.num}`);
-        
+
         // Appel de l'API sans timeout global
         await apiService.generateStandardImage(territory);
-        
+
         console.log(`✅ Territoire ${territory.num} généré avec succès (tentative ${attempt})`);
         return { success: true };
-        
+
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Erreur inconnue';
         console.warn(`❌ Tentative ${attempt}/${maxRetries} échouée pour le territoire ${territory.num}:`, lastError);
-        
+
         // Si ce n'est pas la dernière tentative, attendre un peu avant de réessayer
         if (attempt < maxRetries && !abortControllerRef.current?.signal.aborted) {
           // Délai progressif : 1s, 2s, 3s, etc.
@@ -47,7 +47,7 @@ export const useApiGenerate = () => {
         }
       }
     }
-    
+
     console.error(`💥 Échec définitif pour le territoire ${territory.num} après ${maxRetries} tentatives`);
     return { success: false, error: lastError };
   }, []);
@@ -63,26 +63,26 @@ export const useApiGenerate = () => {
 
     // 🎯 NOUVEAU: Vérifier en BDD quels territoires ont déjà des images générées
     let territoriesToGenerate = territories;
-    
+
     try {
       console.log('🔍 Vérification des territoires existants en base de données...')
-      
+
       // Récupérer tous les territoires existants avec leurs images depuis la DB
       const dbTerritories = await apiService.getTerritories()
       console.log(`📊 Territoires trouvés en DB: ${dbTerritories.length}`)
-      
+
       if (dbTerritories.length > 0) {        // Créer un Set des numéros de territoires qui ont déjà une image standard ET une miniature
         const territoriesWithImages = new Set(
           dbTerritories
             .filter(t => t.image && t.miniature) // Territoire avec image standard ET miniature
             .map(t => t.num)
         )
-        
+
         console.log(`✅ Territoires avec images existantes: [${Array.from(territoriesWithImages).join(', ')}]`)
-        
+
         // Filtrer pour ne générer QUE les territoires sans images
         territoriesToGenerate = territories.filter(t => !territoriesWithImages.has(t.num))
-        
+
         console.log(`🎯 Territoires à générer: [${territoriesToGenerate.map(t => t.num).join(', ')}]`)
       }
     } catch (error) {
@@ -131,7 +131,7 @@ export const useApiGenerate = () => {
 
         // Générer avec retry
         const result = await generateImageWithRetry(territory);
-        
+
         // Mettre à jour les compteurs
         completedCount++
         if (result.success) {
