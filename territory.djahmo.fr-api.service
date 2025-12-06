@@ -1,0 +1,13 @@
+[Unit]
+Description=Territory Generator Backend API
+After=network.target
+
+[Service]
+WorkingDirectory=/var/www/perso/TerritoryGenerator/apps/backend
+ExecStart=/home/djahmo/.nvm/versions/node/v24.11.1/bin/npm run start:prod
+Restart=always
+RestartSec=3
+User=djahmo
+
+[Install]
+WantedBy=multi-user.target
