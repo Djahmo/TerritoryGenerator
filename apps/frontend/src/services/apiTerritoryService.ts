@@ -1,4 +1,5 @@
 import type { Territory, ImageGenerationConfig } from '../utils/types'
+import { accountFetch, getAccountScope } from './accountScope'
 
 /**
  * Service pour utiliser l'API backend pour la génération d'images de territoires
@@ -6,6 +7,7 @@ import type { Territory, ImageGenerationConfig } from '../utils/types'
  */
 export class ApiTerritoryService {
   private baseUrl: string
+  private readonly accountScope = getAccountScope()
 
   constructor(baseUrl: string = '/api') {
     this.baseUrl = baseUrl
@@ -15,16 +17,13 @@ export class ApiTerritoryService {
    * Effectue une requête avec AbortController pour éviter les timeouts bloquants
    */
   private async fetchWithoutTimeout(url: string, options: RequestInit = {}): Promise<Response> {
-    const controller = new AbortController()
-
     const fetchOptions: RequestInit = {
       ...options,
-      signal: controller.signal,
       credentials: 'include'
     }
 
     try {
-      const response = await fetch(url, fetchOptions)
+      const response = await accountFetch(this.accountScope, url, fetchOptions)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -149,7 +148,7 @@ export class ApiTerritoryService {
    * Supprime une image de territoire
    */
   async deleteTerritoryImage(territoryNumber: string, imageType: string) {
-    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/images/${territoryNumber}/${imageType}`, {
+    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/images/${encodeURIComponent(territoryNumber)}/${encodeURIComponent(imageType)}`, {
       method: 'DELETE'
     })
     return await response.json()
@@ -207,7 +206,7 @@ export class ApiTerritoryService {
    * Supprime les anciennes images/layers avant de sauvegarder les nouveaux pour éviter la duplication
    */
   async updateTerritoryComplete(territory: Territory): Promise<{ success: boolean }> {
-    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${territory.num}/complete`, {
+    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${encodeURIComponent(territory.num)}/complete`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -246,7 +245,7 @@ export class ApiTerritoryService {
    * Sauvegarde UNIQUEMENT les données standard d'un territoire
    */
   async saveTerritoryStandard(territory: Territory): Promise<{ success: boolean }> {
-    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${territory.num}/standard`, {
+    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${encodeURIComponent(territory.num)}/standard`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -283,7 +282,7 @@ export class ApiTerritoryService {
    * Sauvegarde UNIQUEMENT les données large d'un territoire
    */
   async saveTerritoryLarge(territory: Territory): Promise<{ success: boolean }> {
-    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${territory.num}/large`, {
+    const response = await this.fetchWithoutTimeout(`${this.baseUrl}/territories/${encodeURIComponent(territory.num)}/large`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

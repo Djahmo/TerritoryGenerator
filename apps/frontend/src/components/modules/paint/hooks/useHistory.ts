@@ -1,45 +1,23 @@
-import { useState, useCallback } from "react"
-import type { DrawObject } from "../utils/types"
+import { useState, useRef, useCallback } from 'react'
+import type { DrawObject } from '../utils/types'
 
 export const useHistory = (objects: DrawObject[]) => {
-  const [history, setHistory] = useState<DrawObject[][]>([objects])
-  const [historyIndex, setHistoryIndex] = useState(0)
-
-  const addToHistory = useCallback((newObjects: DrawObject[]) => {
-    setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1)
-      newHistory.push(newObjects)
-      return newHistory
-    })
-    setHistoryIndex(prev => prev + 1)
-  }, [historyIndex])
-
-  const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1)
-      return history[historyIndex - 1]
-    }
-    return objects
-  }, [historyIndex, history, objects])
-
-  const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1)
-      return history[historyIndex + 1]
-    }
-    return objects
-  }, [historyIndex, history, objects])
-
-  const canUndo = historyIndex > 0
-  const canRedo = historyIndex < history.length - 1
-
-  return {
-    history,
-    historyIndex,
-    addToHistory,
-    undo,
-    redo,
-    canUndo,
-    canRedo
-  }
+  const state = useRef({ history: [objects], historyIndex: 0 })
+  const [snapshot, setSnapshot] = useState(state.current)
+  const addToHistory = useCallback((next: DrawObject[]) => {
+    const { history, historyIndex } = state.current
+    const updated = [...history.slice(0, historyIndex + 1), next].slice(-100)
+    state.current = { history: updated, historyIndex: updated.length - 1 }
+    setSnapshot(state.current)
+  }, [])
+  const move = useCallback((direction: number) => {
+    const { history, historyIndex } = state.current
+    const index = Math.max(0, Math.min(history.length - 1, historyIndex + direction))
+    state.current = { history, historyIndex: index }
+    setSnapshot(state.current)
+    return history[index]
+  }, [])
+  const undo = useCallback(() => move(-1), [move])
+  const redo = useCallback(() => move(1), [move])
+  return { ...snapshot, addToHistory, undo, redo, canUndo: snapshot.historyIndex > 0, canRedo: snapshot.historyIndex < snapshot.history.length - 1 }
 }

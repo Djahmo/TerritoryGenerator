@@ -13,7 +13,14 @@ export interface PanStart {
   offsetY: number;
 }
 
-export interface DrawBrush {
+export interface DrawingMetadata {
+  visible?: boolean;
+  locked?: boolean;
+  timestamp?: number;
+  name?: string;
+}
+
+export interface DrawBrush extends DrawingMetadata {
   id: string;
   type: 'brush';
   color: string;
@@ -21,7 +28,7 @@ export interface DrawBrush {
   points: Point[];
 }
 
-export interface DrawLine {
+export interface DrawLine extends DrawingMetadata {
   id: string;
   type: 'line';
   color: string;
@@ -32,7 +39,7 @@ export interface DrawLine {
   endY: number;
 }
 
-export interface DrawParking {
+export interface DrawParking extends DrawingMetadata {
   id: string;
   type: 'parking';
   color: string;
@@ -40,7 +47,7 @@ export interface DrawParking {
   y: number;
 }
 
-export interface DrawCompass {
+export interface DrawCompass extends DrawingMetadata {
   id: string;
   type: 'compass';
   color: string;
@@ -49,7 +56,7 @@ export interface DrawCompass {
   rotation?: number; // Rotation en radians pour orienter la rose des vents
 }
 
-export interface DrawText {
+export interface DrawText extends DrawingMetadata {
   id: string;
   type: 'text';
   color: string;
@@ -59,7 +66,7 @@ export interface DrawText {
   content: string;
 }
 
-export interface DrawRectangle {
+export interface DrawRectangle extends DrawingMetadata {
   id: string;
   type: 'rectangle';
   color: string;
@@ -70,7 +77,7 @@ export interface DrawRectangle {
   endY: number;
 }
 
-export interface DrawCircle {
+export interface DrawCircle extends DrawingMetadata {
   id: string;
   type: 'circle';
   color: string;
@@ -81,7 +88,7 @@ export interface DrawCircle {
   endY: number;
 }
 
-export interface DrawArrow {
+export interface DrawArrow extends DrawingMetadata {
   id: string;
   type: 'arrow';
   color: string;
@@ -92,7 +99,7 @@ export interface DrawArrow {
   endY: number;
 }
 
-export interface DrawSelection {
+export interface DrawSelection extends DrawingMetadata {
   id: string;
   type: 'selection';
   startX: number;

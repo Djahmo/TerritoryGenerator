@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
-import { DOMParser } from '@xmldom/xmldom'
-import * as toGeoJSON from '@tmcw/togeojson'
 import { Link } from 'react-router'
 import { useApiTerritory } from '&/useApiTerritory'
 import type { Territory } from '../utils/types'
@@ -13,8 +11,8 @@ import FileUpload from '../components/ui/FileUpload'
 import { useTranslation } from 'react-i18next'
 import { ApiTerritoryService } from '../services/apiTerritoryService'
 
-// Créer une instance du service API
-const apiService = new ApiTerritoryService()
+import { geometryChanged } from '../utils/territoryFiles'
+import { useDrawingDrafts } from '../services/drawingDrafts'
 
 interface TerritoryGeoJSON {
   territory: any // Utilisation du type du cache
@@ -48,7 +46,7 @@ const TerritoryOverlay: React.FC<{
         </button>
       </div>
       <Link
-        to={`/territory/${territory.num}`}
+        to={`/territory/${encodeURIComponent(territory.num)}`}
         className="btn-accent text-white no-underline inline-flex items-center gap-2 w-full justify-center"
         onClick={onClose}
       >
@@ -59,7 +57,8 @@ const TerritoryOverlay: React.FC<{
 }
 
 const AllTerritory: React.FC = () => {
-  const { cache, loading, updateGpx, updateTerritories, loadFromBackend } = useApiTerritory()
+  const { cache, loading, loadFromBackend } = useApiTerritory()
+  const processedContent = useRef<string | null>(null)
   const { content, type, error: fileError, readFile } = useFileReader()
   const { loading: imgLoading, error: imgError, progress, generateImages } = useApiGenerate()
   const { t } = useTranslation()
@@ -120,32 +119,12 @@ const AllTerritory: React.FC = () => {
 
         const territoriesWithGeoJSON: TerritoryGeoJSON[] = []
 
-        if (cache?.gpx && cache?.territories) {
-
-          try {
-            // Convertir GPX vers GeoJSON
-            const parser = new DOMParser()
-            const gpxDoc = parser.parseFromString(cache.gpx, 'application/xml')
-            const geoJson = toGeoJSON.gpx(gpxDoc)
-
-            if (geoJson && geoJson.features && geoJson.features.length > 0) {
-              // Associer chaque feature à un territoire
-              geoJson.features.forEach((feature: any, index: number) => {
-                const territory = cache.territories[index]
-                if (territory) {
-                  territoriesWithGeoJSON.push({
-                    territory,
-                    geoJson: {
-                      type: 'FeatureCollection',
-                      features: [feature]
-                    }
-                  })
-                }
-              })
-            }
-          } catch (err) {
-            console.warn('Erreur lors de la conversion GPX:', err)
-          }
+        for (const territory of cache?.territories ?? []) {
+          territoriesWithGeoJSON.push({ territory, geoJson: {
+            type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: {
+              type: 'LineString', coordinates: territory.polygon.map(p => [p.lon, p.lat]),
+            } }],
+          } })
         }
         setTerritoriesGeoJSON(territoriesWithGeoJSON)
 
@@ -163,65 +142,37 @@ const AllTerritory: React.FC = () => {
     }
   }, [cache, loading])
   useEffect(() => {
-    (async () => {
-      if (content && type) {
-        try {
-          setError(null)
-          setIsProcessingNewFile(true) // Commencer le traitement
-          const newTerritories = parse(content, type)
-
-          // Fusionner avec les territoires existants pour préserver les noms personnalisés
-          let finalTerritories = newTerritories
-
-          // Si on a des territoires existants en cache, fusionner intelligemment
-          if (cache?.territories?.length) {
-            console.log('🔄 Fusion des territoires existants avec les nouveaux pour préserver les noms personnalisés')
-
-            finalTerritories = newTerritories.map(newTerritory => {
-              // Chercher un territoire existant avec le même numéro
-              const existingTerritory = cache.territories.find(existing => existing.num === newTerritory.num)
-
-              if (existingTerritory && existingTerritory.name && existingTerritory.name !== newTerritory.name) {
-                // Préserver le nom personnalisé existant
-                console.log(`📝 Préservation du nom personnalisé pour ${newTerritory.num}: "${existingTerritory.name}" (au lieu de "${newTerritory.name}")`)
-                return {
-                  ...newTerritory,
-                  name: existingTerritory.name // Garder le nom personnalisé
-                }
-              }
-
-              return newTerritory
-            })
-          }
-
-          if (finalTerritories.length) {
-            const gpxData = makeGpx(finalTerritories)
-
-            // Sauvegarde des données au backend
-            await apiService.saveTerritoryData(gpxData)
-
-            // Mise à jour des données locales immédiatement
-            updateGpx(gpxData)            // Génération des images (avec vérification automatique en DB)
-            await generateImages(finalTerritories, (territorys: Territory[]) => {
-              // Mettre à jour les territoires après génération
-              updateTerritories(territorys)
-            }) // Plus besoin de passer cache?.territories car la vérification se fait en DB
-
-            // IMPORTANT: Recharger depuis le backend pour récupérer
-            // les territoires avec les layers et images associés
-            await new Promise(resolve => setTimeout(resolve, 1000)) // Attendre un peu
-            await loadFromBackend()
-
-            setIsProcessingNewFile(false) // Terminer le traitement
-          }
-        } catch (error) {
-          console.error('❌ Erreur lors du traitement du fichier:', error)
-          setError(`Erreur lors du traitement du fichier: ${error}`)
-          setIsProcessingNewFile(false) // Terminer le traitement même en cas d'erreur
-        }
+    if (!content) processedContent.current = null
+    if (!content || !type || loading || processedContent.current === content) return
+    processedContent.current = content
+    const apiService = new ApiTerritoryService()
+    void (async () => {
+      setError(null)
+      setIsProcessingNewFile(true)
+      try {
+        const imported = parse(content, type)
+        const previous = cache?.territories ?? []
+        const changed = previous.filter(old => {
+          const next = imported.find(t => t.num === old.num)
+          return !next || geometryChanged(old, next)
+        })
+        if (changed.length && !window.confirm(`Les contours de ${changed.map(t => t.num).join(', ')} sont modifiés ou supprimés. Leurs anciennes cartes et annotations seront retirées. Continuer l’import ?`)) return
+        const finalTerritories = imported.map(next => {
+          const old = previous.find(t => t.num === next.num)
+          return { ...next, name: old?.name || next.name }
+        })
+        await apiService.saveTerritoryData(makeGpx(finalTerritories))
+        changed.forEach(t => useDrawingDrafts.getState().clearTerritory(t.num))
+        await loadFromBackend()
+        await generateImages(finalTerritories, () => {})
+        await loadFromBackend()
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Import impossible')
+      } finally {
+        setIsProcessingNewFile(false)
       }
     })()
-  }, [content, type, generateImages, updateGpx, updateTerritories, loadFromBackend]) // Retirer cache?.territories des deps
+  }, [content, type, loading, cache, generateImages, loadFromBackend])
 
   useEffect(() => {
     const handleResize = () => {
@@ -274,37 +225,11 @@ const AllTerritory: React.FC = () => {
     )
   }
 
-  if (error || imgError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error || imgError}</p>
-          <Link
-            to="/"
-            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retour à l'accueil
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (fileError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{fileError}</p>
-          <Link
-            to="/"
-            className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retour à l'accueil
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  if (error || imgError || fileError) return <div className="p-8 flex flex-col items-center gap-4">
+    <p role="alert">{error || imgError || fileError}</p>
+    <FileUpload onFile={readFile} />
+    <Link to="/territories">Voir les territoires enregistrés</Link>
+  </div>
   if (territoriesGeoJSON.length === 0) {
     return (
       <div className="h-screen w-full relative">
@@ -325,7 +250,7 @@ const AllTerritory: React.FC = () => {
               Il n'y a pas encore de territoires avec des données GPX. Téléversez un fichier CSV ou GPX pour commencer.
             </p>
             <FileUpload
-              onFile={file => readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')}
+              onFile={file => readFile(file)}
               loading={imgLoading}
             />
           </div>
@@ -360,9 +285,9 @@ const AllTerritory: React.FC = () => {
             url="/tiles/{z}/{x}/{y}.png"
           />
 
-          {territoriesGeoJSON.map((item, index) => (
+          {territoriesGeoJSON.map((item) => (
             <GeoJSON
-              key={`${item.territory.num}-${index}`}              data={item.geoJson}
+              key={`${item.territory.num}-${JSON.stringify(item.territory.polygon)}`}              data={item.geoJson}
               style={{
                 color: config?.contourColor || '#3388ff', // Couleur par défaut si config n'est pas chargé
                 weight: 3,
@@ -401,13 +326,10 @@ const AllTerritory: React.FC = () => {
               Téléversez un nouveau fichier CSV ou GPX pour remplacer vos territoires actuels.
             </p>            <FileUpload
               onFile={async (file) => {
-                readFile(file, file.name.endsWith('.csv') ? 'latin1' : 'utf-8')
+                readFile(file)
                 setShowUpload(false)
 
-                // Attendre un peu puis recharger depuis le backend
-                setTimeout(async () => {
-                  await loadFromBackend()
-                }, 2000) // 2 secondes pour laisser le temps au traitement
+
               }}
               loading={imgLoading}
             />

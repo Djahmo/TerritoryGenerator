@@ -10,15 +10,17 @@ import { error, success, sendApiC } from '@/utils'
 import { Switch } from '@/components/ui/shadcn'
 import Loader from '@/components/ui/Loader'
 import { useUser } from '&/useUser'
-import { redirect } from 'react-router'
+import { useNavigate } from 'react-router'
 
 const Auth = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { fetchMe, user, clearUserCache } = useUser()
   const [tab, setTab] = useState<'login' | 'register' | 'reset'>('login')
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ username: '', email: '', password: '', remember: false })
   const [loading, setLoading] = useState(false)
+  const [sendingConfirmation, setSendingConfirmation] = useState(false)
   const isMobile = useMediaQuery('(max-width: 767px)')
   const loginRef = useRef<HTMLDivElement>(null)
   const registerRef = useRef<HTMLDivElement>(null)
@@ -68,12 +70,12 @@ const Auth = () => {
       await sendApiC('/auth/logout')
       clearUserCache() // Vider le cache local
       await fetchMe()
-      redirect('/')
+      navigate('/')
     } catch (error) {
       // En cas d'erreur de déconnexion, vider quand même le cache local
       console.warn('Erreur lors de la déconnexion, nettoyage du cache local')
       clearUserCache()
-      redirect('/')
+      navigate('/')
     }
   }
 
@@ -82,7 +84,8 @@ const Auth = () => {
       const payload = {
         email: form.email,
         ...((tab === 'register' || tab === 'login') && { password: form.password }),
-        ...(tab === 'register' && { username: form.username })
+        ...(tab === 'register' && { username: form.username }),
+        ...(tab === 'login' && { remember: form.remember })
       }
       setLoading(true)
       await sendApiC(`/auth/${tab}`, 'POST', {
@@ -93,7 +96,7 @@ const Auth = () => {
       if (tab !== 'reset') {
         await fetchMe()
         setOpen(false)
-        redirect('/')
+        navigate('/')
       }
       else
         setTab('login')
@@ -110,6 +113,21 @@ const Auth = () => {
 
   return (
     <>
+      {user && !user.emailVerified && (
+        <button className="btn-positive w-full mb-2" disabled={sendingConfirmation} onClick={async () => {
+          setSendingConfirmation(true)
+          try {
+            await sendApiC('/auth/confirm/resend', 'POST')
+            success(t('c.md.auth.confirmationSent'))
+          } catch (err) {
+            error(err)
+          } finally {
+            setSendingConfirmation(false)
+          }
+        }}>
+          {t('c.md.auth.resendConfirmation')}
+        </button>
+      )}
       {user?.username ?
         <button className="btn-negative w-full" onClick={handleLogout}>
           {t('c.md.auth.logout')}

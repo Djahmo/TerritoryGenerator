@@ -1,34 +1,26 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { encodeLayerData, decodeLayer, layerOrder, type DocumentLayer } from '../../utils/layerDocument.js'
+import { eq, and, desc, asc } from 'drizzle-orm'
 import { db } from '../index.js'
 import { images, territories, layers } from '../../schema/territories.js'
 import { nanoid } from 'nanoid'
 import { reconstructTerritoriesFromGpx } from '../../utils/gpxParser.js'
 import env from '../../env.js'
-import path from 'path'
 import { promises as fs } from 'fs'
 
 // Constante pour l'URL frontend ou URL par défaut si env non défini
 const FRONTEND_URL = env.FRONTEND_URL || "http://localhost:3000";
 
-// Fonction utilitaire pour générer le nom de fichier basé sur le territoire et le type
-export const generateFileName = (territoryNumber: string, imageType: string): string => {
-  const extension = imageType === 'miniature' ? 'webp' : 'png'
-  return `${territoryNumber}-${imageType}.${extension}`
-}
+import { getImageFileName, resolveImagePath, userIdSchema } from '../../lib/secure/imagePaths.js'
+import { imageRoot } from '../../lib/secure/storage.js'
+export { getImageFileName } from '../../lib/secure/imagePaths.js'
+export const generateFileName = getImageFileName
 
-// Fonctions utilitaires pour les fichiers
-export const getImageFileName = (territoryNumber: string, imageType: string): string => {
-  const extension = imageType === 'miniature' ? 'webp' : 'png'
-  return `${territoryNumber}-${imageType}.${extension}`
-}
-
-export const getImageFilePath = (userId: string, territoryNumber: string, imageType: string): string => {
-  return `/${userId}/${getImageFileName(territoryNumber, imageType)}`
-}
+export const getImageFilePath = (userId: string, territoryNumber: string, imageType: string): string =>
+  `/${userIdSchema.parse(userId)}/${encodeURIComponent(getImageFileName(territoryNumber, imageType))}`
 
 export const getImageFileSize = async (userId: string, territoryNumber: string, imageType: string): Promise<number> => {
   try {
-    const filePath = path.join(process.cwd(), 'public', userId, getImageFileName(territoryNumber, imageType))
+    const filePath = resolveImagePath(imageRoot, userId, territoryNumber, imageType)
     const stats = await fs.stat(filePath)
     return stats.size
   } catch {
@@ -121,7 +113,7 @@ export const deleteTerritoryImage = async (userId: string, territoryNumber: stri
     .where(and(...whereConditions))
 
   // Retourner les chemins des fichiers pour pouvoir les supprimer
-  return imagesToDelete.map(img => path.join(process.cwd(), 'public', getImageFilePath(img.userId, img.territoryNumber, img.imageType)))
+  return imagesToDelete.map(img => resolveImagePath(imageRoot, img.userId, img.territoryNumber, img.imageType))
 }
 
 /**
@@ -146,46 +138,30 @@ export const deleteModifiedTerritoryImages = async (userId: string, territoryNum
     .where(and(...whereConditions))
 
   // Retourner les chemins des fichiers pour pouvoir les supprimer
-  return imagesToDelete.map(img => path.join(process.cwd(), 'public', getImageFilePath(img.userId, img.territoryNumber, img.imageType)))
+  return imagesToDelete.map(img => resolveImagePath(imageRoot, img.userId, img.territoryNumber, img.imageType))
 }
 
 // Données de territoires
 export const saveTerritoryData = async (userId: string, gpxData: string) => {
-  if (!gpxData || gpxData.trim() === '') {
-    console.error('❌ Erreur: Tentative de sauvegarde avec des données GPX vides')
-    return null
-  }
-
-  try {
-    const existing = await db
-      .select()
-      .from(territories)
-      .where(eq(territories.userId, userId))
-      .limit(1)
-
-    if (existing.length > 0) {
-      await db
-        .update(territories)
-        .set({ data: gpxData, updatedAt: new Date() })
-        .where(eq(territories.userId, userId))
-      return existing[0]
-    } else {
-      const insertData = {
-        userId,
-        data: gpxData
-      }
-      try {
-        await db.insert(territories).values(insertData)
-        return { userId, gpxData }
-      } catch (dbError) {
-        console.error('❌ Erreur lors de l\'insertion en BDD:', dbError)
-        throw dbError
+  const incoming = reconstructTerritoriesFromGpx(gpxData)
+  if (!incoming.length) throw new Error('GPX invalide ou vide')
+  return db.transaction(async tx => {
+    const [existing] = await tx.select().from(territories).where(eq(territories.userId, userId)).limit(1).for('update')
+    const previous = existing?.data ? reconstructTerritoriesFromGpx(existing.data) : []
+    const byNumber = new Map(incoming.map(t => [t.num, t]))
+    // Geometry changes invalidate both raster images and pixel-based annotations.
+    // The import UI explicitly confirms this before replacing existing data.
+    for (const old of previous) {
+      const next = byNumber.get(old.num)
+      if (!next || JSON.stringify(old.polygon) !== JSON.stringify(next.polygon)) {
+        await tx.delete(images).where(and(eq(images.userId, userId), eq(images.territoryNumber, old.num)))
+        await tx.delete(layers).where(and(eq(layers.userId, userId), eq(layers.territoryNumber, old.num)))
       }
     }
-  } catch (error) {
-    console.error('❌ Erreur dans saveTerritoryData:', error)
-    throw error
-  }
+    await tx.insert(territories).values({ userId, data: gpxData })
+      .onDuplicateKeyUpdate({ set: { data: gpxData, updatedAt: new Date() } })
+    return { userId, data: gpxData }
+  })
 }
 
 export const getTerritoryDataByUser = async (userId: string) => {
@@ -246,7 +222,7 @@ export const getReconstructedTerritories = async (userId: string) => {
       };
     });
 
-    allLayers.forEach(layer => {
+    allLayers.sort((a, b) => layerOrder(a) - layerOrder(b)).forEach(layer => {
       if (!layersByTerritory[layer.territoryNumber]) {
         layersByTerritory[layer.territoryNumber] = {
           paintLayersImage: [],
@@ -255,15 +231,7 @@ export const getReconstructedTerritories = async (userId: string) => {
       }
 
       // Convertir le layer de la base de données vers le format PaintLayer
-      const paintLayer = {
-        id: layer.id,
-        visible: layer.visible,
-        locked: layer.locked,
-        style: JSON.parse(layer.style),
-        timestamp: layer.createdAt ? new Date(layer.createdAt).getTime() : Date.now(),
-        type: layer.layerType,
-        data: JSON.parse(layer.layerData)
-      };
+      const paintLayer = decodeLayer(layer);
 
       if (layer.imageType === 'standard') {
         layersByTerritory[layer.territoryNumber].paintLayersImage.push(paintLayer);
@@ -389,7 +357,7 @@ export const getTerritoryLayersByUser = async (userId: string, territoryNumber?:
     .select()
     .from(layers)
     .where(and(...whereConditions))
-    .orderBy(desc(layers.createdAt))
+    .orderBy(asc(layers.createdAt), asc(layers.id))
 }
 
 export const getTerritoryLayer = async (userId: string, layerId: string) => {
@@ -472,35 +440,17 @@ export const deleteTerritoryLayersByTerritory = async (userId: string, territory
  * Supprime tous les anciens layers du territoire avant d'ajouter les nouveaux
  */
 export const saveTerritoryLayers = async (
-  userId: string,
-  territoryNumber: string,
-  imageType: 'standard' | 'large',
-  layersData: Array<{
-    id?: string
-    type: string
-    visible: boolean
-    locked: boolean
-    style: any
-    data: any
-  }>
-) => {  // Supprimer tous les anciens layers de ce territoire et type d'image
-  await deleteTerritoryLayersByTerritory(userId, territoryNumber, imageType)
-
-  // Ajouter les nouveaux layers
-  const savedLayers = []
-  for (const layer of layersData) {
-    const savedLayer = await createTerritoryLayer({
-      userId,
-      territoryNumber,
-      imageType,
-      layerType: layer.type as 'brush' | 'line' | 'arrow' | 'circle' | 'rectangle' | 'text' | 'parking' | 'compass',
-      layerData: JSON.stringify(layer.data),
-      style: JSON.stringify(layer.style),
-      visible: layer.visible,
-      locked: layer.locked
-    })
-    savedLayers.push(savedLayer)
-  }
-
-  return savedLayers
-}
+  userId: string, territoryNumber: string, imageType: 'standard' | 'large', layersData: DocumentLayer[]
+) => db.transaction(async tx => {
+  // Serialize replacement of an entire document, including an empty document.
+  await tx.select().from(territories).where(eq(territories.userId, userId)).for('update')
+  await tx.delete(layers).where(and(eq(layers.userId, userId), eq(layers.territoryNumber, territoryNumber), eq(layers.imageType, imageType)))
+  const rows = layersData.map((layer, order) => ({
+    id: nanoid(), userId, territoryNumber, imageType,
+    layerType: layer.type as typeof layers.$inferInsert.layerType,
+    layerData: encodeLayerData(layer, order), style: JSON.stringify(layer.style),
+    visible: layer.visible ?? true, locked: layer.locked ?? false,
+  }))
+  if (rows.length) await tx.insert(layers).values(rows)
+  return rows
+})

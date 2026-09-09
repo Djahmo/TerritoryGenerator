@@ -38,6 +38,7 @@ export class SelectionTool {
     const bounds = getBoundsFromRect(selection);
 
     return objects.filter(obj => {
+      if (obj.visible === false || obj.locked) return false;
       const center = getObjectCenter(obj);
       return center.x >= bounds.minX && center.x <= bounds.maxX &&
              center.y >= bounds.minY && center.y <= bounds.maxY;
@@ -47,7 +48,7 @@ export class SelectionTool {
   static findObjectAt(point: Point, objects: DrawObject[]): DrawObject | null {
     // Check from last to first (top to bottom in visual terms)
     for (let i = objects.length - 1; i >= 0; i--) {
-      if (isPointInObject(point, objects[i])) {
+      if (objects[i].visible !== false && !objects[i].locked && isPointInObject(point, objects[i])) {
         return objects[i];
       }
     }

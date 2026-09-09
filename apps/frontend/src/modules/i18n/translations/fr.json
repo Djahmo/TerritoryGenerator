@@ -1,4 +1,5 @@
 {
+  "config": { "restoreIgnUrl": "Utiliser l’URL IGN officielle" },
   "language": "Français",
   "p": {
     "notfound": {
@@ -41,6 +42,8 @@
           "needLogin": "Tu dois être connecté pour utiliser cette fonctionnalité."
         },
         "logout": "Déconnexion",
+        "resendConfirmation": "Renvoyer le lien de confirmation",
+        "confirmationSent": "Un nouveau lien de confirmation a été envoyé.",
         "login": {
           "title": "Me connecter",
           "submit": "Se connecter",

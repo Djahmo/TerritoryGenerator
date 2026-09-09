@@ -36,7 +36,7 @@ const sendMail = async ({ type, lang, from, token, to, data, replyTo }: SendMail
       user: from,
       pass: token,
     },
-  } as nodemailer.TransportOptions)
+  })
 
   let mail
   try {

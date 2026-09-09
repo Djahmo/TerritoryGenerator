@@ -2,6 +2,9 @@ import React from 'react';
 import { Undo, Redo, Trash2, Download } from 'lucide-react';
 
 interface ActionButtonsProps {
+  saving?: boolean;
+  canSave?: boolean;
+  dirty?: boolean;
   canUndo: boolean;
   canRedo: boolean;
   selectedObjectsLength: number;
@@ -13,7 +16,7 @@ interface ActionButtonsProps {
   onGoCrop: () => void;
 }
 
-export const ActionButtons: React.FC<ActionButtonsProps> = ({ canUndo, canRedo, isLarge, selectedObjectsLength, onUndo, onRedo, onClear, onExport, onGoCrop }) => {
+export const ActionButtons: React.FC<ActionButtonsProps> = ({ saving, canSave, dirty, canUndo, canRedo, isLarge, selectedObjectsLength, onUndo, onRedo, onClear, onExport, onGoCrop }) => {
   return (
     <div className="space-y-2">
       {isLarge && <button
@@ -51,12 +54,13 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ canUndo, canRedo, 
         <span className="text-sm">Effacer {selectedObjectsLength} objet{selectedObjectsLength > 1 ? "s" : ""}</span>
       </button>
       <button
+        disabled={saving || !canSave}
         onClick={onExport}
         className="w-full p-2 rounded border cursor-pointer border-success text-success hover:bg-success-hover/20 flex items-center justify-center gap-1"
         title="Exporter"
       >
         <Download size={16} />
-        <span className="text-sm">Sauvegarder</span>
+        <span className="text-sm">{saving ? "Sauvegarde…" : dirty ? "Sauvegarder les modifications" : "Sauvegarder"}</span>
       </button>
     </div>
   );

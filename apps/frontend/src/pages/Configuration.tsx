@@ -6,7 +6,7 @@ import Input from '#/ui/Input'
 import { Slider, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/ui/shadcn'
 import SeparatorX from '#/ui/SeparatorX'
 import { useApiConfig } from '@/hooks/useApiConfig'
-import { Download, Upload, RotateCcw, Github, Mail } from 'lucide-react'
+import { Download, Upload, RotateCcw, GitFork, Mail } from 'lucide-react'
 import Picker from '#/modules/paint/components/Picker'
 import Auth from '@/components/modules/auth/Auth'
 
@@ -395,9 +395,15 @@ const Configuration = () => {
               <Input
                 type="text"
                 value={config.ignApiBaseUrl}
-                onChange={(e) => setConfigProperty('ignApiBaseUrl', e.target.value)}
+                disabled
+                onChange={() => {}}
                 placeholder="https://data.geopf.fr/wms-r"
               />
+              {config.ignApiBaseUrl !== 'https://data.geopf.fr/wms-r' && (
+                <button className="btn-positive mt-2" onClick={() => setConfigProperty('ignApiBaseUrl', 'https://data.geopf.fr/wms-r')}>
+                  {t('config.restoreIgnUrl')}
+                </button>
+              )}
             </div>
             <div className="flex flex-row gap-4">
               <div>
@@ -460,7 +466,7 @@ const Configuration = () => {
               className="hover:text-positive transition-colors"
               title="Code source"
             >
-              <Github size={30} />
+              <GitFork size={30} />
             </a>
             <a
               href="mailto:contact@djahmo.fr"

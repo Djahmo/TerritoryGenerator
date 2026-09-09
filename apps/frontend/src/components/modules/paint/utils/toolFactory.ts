@@ -28,7 +28,7 @@ export interface BaseShapeWithPosition {
 /**
  * Génère un ID unique basé sur le timestamp
  */
-export const generateId = (): string => Date.now().toString();
+export const generateId = (): string => crypto.randomUUID();
 
 /**
  * Crée un objet de base pour les outils utilisant des coordonnées start/end

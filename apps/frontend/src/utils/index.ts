@@ -13,7 +13,7 @@ export const capitalize = (str: string) =>
  * @returns L'URL avec un timestamp ajouté
  */
 export const addImageTimestamp = (imageUrl: string): string => {
-  if (!imageUrl || imageUrl.trim() === '') return imageUrl;
+  if (!imageUrl || /^(data:|blob:)/i.test(imageUrl)) return imageUrl;
 
   const separator = imageUrl.includes('?') ? '&' : '?';
   return `${imageUrl}${separator}t=${Date.now()}`;

@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 import { sendApiC } from '../utils'
 import { User } from '%/types'
 
+let authRequestVersion = 0
+
 interface UserState {
   user: User | null
   loading: boolean
@@ -19,11 +21,14 @@ export const useUser = create<UserState>()(
     (set, get) => ({
       user: null,
       loading: true,
-      initialized: false,      fetchMe: async () => {
+      initialized: false,
+      fetchMe: async () => {
+        const version = ++authRequestVersion
         set({ loading: true })
 
         try {
           const response = await sendApiC('/me') as User
+          if (version !== authRequestVersion) return
           if (!response) {
             set({ user: null })
             return
@@ -36,23 +41,19 @@ export const useUser = create<UserState>()(
             createdAt: response.createdAt
           }
           set({ user })
-        } catch (error: any) {
-          // Si l'utilisateur n'est pas trouvé côté serveur (401/404), on vide le cache local
-          if (error?.response?.status === 401 || error?.response?.status === 404) {
-            console.log('Utilisateur non trouvé côté serveur, nettoyage du cache local')
-            set({ user: null })
-          } else {
-            set({ user: null })
-          }
+        } catch {
+          if (version !== authRequestVersion) return
+          set({ user: null })
         } finally {
-          set({ loading: false, initialized: true })
+          if (version === authRequestVersion) set({ loading: false, initialized: true })
         }
       },
 
-      setUser: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      setUser: (user) => { authRequestVersion++; set({ user, loading: false }) },
+      logout: () => { authRequestVersion++; set({ user: null, loading: false }) },
       clearUserCache: () => {
-        set({ user: null })
+        authRequestVersion++
+        set({ user: null, loading: false })
         // Vider aussi le localStorage manuellement
         localStorage.removeItem('user')
       },
@@ -60,13 +61,6 @@ export const useUser = create<UserState>()(
     }),    {
       name: 'user',
       partialize: (state) => ({ user: state.user }),
-      // Force la vérification utilisateur au démarrage
-      onRehydrateStorage: () => (state) => {
-        // Toujours déclencher fetchMe au démarrage pour vérifier l'état d'authentification
-        setTimeout(() => {
-          state?.fetchMe()
-        }, 100)
-      }
     }
   )
 )

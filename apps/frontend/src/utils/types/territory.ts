@@ -34,6 +34,7 @@ export type RectangleLayerData = {
 }
 
 export type TextLayerData = {
+  fontSize?: number
   position: Point
   content: string
 }

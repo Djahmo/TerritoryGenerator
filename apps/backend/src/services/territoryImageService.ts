@@ -262,7 +262,7 @@ export class TerritoryImageService {
     const [minLon, minLat, maxLon, maxLat] = bbox
     const bboxWidth = maxLon - minLon
     const bboxHeight = maxLat - minLat
-    const bboxRatio = bboxWidth / bboxHeight
+    const bboxRatio = cropData ? (cropData.width * cropData.imageWidth) / (cropData.height * cropData.imageHeight) : bboxWidth / bboxHeight
 
     // UTILISER LES DIMENSIONS EXACTES DE LA CONFIG LARGE
     const configWidth = this.dimensions.largeFinalWidth || this.dimensions.finalWidth

@@ -6,6 +6,9 @@ export const getSessionById = async (id: string) => {
   return db.select().from(sessions).where(eq(sessions.id, id)).limit(1)
 }
 
+export const getSessionByToken = async (token: string) =>
+  db.select().from(sessions).where(eq(sessions.token, token)).limit(1).then(rows => rows[0])
+
 export const createSession = async (id: string, token:string, userId: string, expiresAt: Date) => {
   return db.insert(sessions).values({ id, token, userId, expiresAt })
 }

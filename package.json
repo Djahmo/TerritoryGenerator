@@ -9,22 +9,39 @@
     "apps/backend"
   ],
   "scripts": {
+    "test": "vitest run --config vitest.config.ts",
     "dev": "npm --workspace=frontend run dev",
     "devapi": "npm --workspace=backend run dev",
     "build": "npm --workspace=frontend run build",
     "drizzle:push": "npm --workspace=backend run drizzle:push",
     "drizzle:generate": "npm --workspace=backend run drizzle:generate",
-    "drizzle:migrate": "npm --workspace=backend run drizzle:migrate"
+    "drizzle:migrate": "npm --workspace=backend run drizzle:migrate",
+    "test:e2e": "playwright test",
+    "audit": "npm audit"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "turbo": "^2.5.3",
-    "typescript": "^5.8.3"
+    "@playwright/test": "^1.63.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
   },
-  "dependencies": {
-    "@xmldom/xmldom": "^0.9.8"
+  "engines": {
+    "node": "^24.0.0 || >=26.0.0",
+    "npm": ">=12.0.0"
+  },
+  "packageManager": "npm@12.0.2",
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.28.2"
+    }
+  },
+  "allowScripts": {
+    "bcrypt": true,
+    "canvas": true,
+    "esbuild": true,
+    "sharp": true
   }
 }

@@ -9,12 +9,16 @@ import Configuration from '@/pages/Configuration'
 import AllTerritory from '@/pages/AllTerritory'
 import Exportation from '@/pages/Exportation'
 import ProtectedRoute from '@/components/ux/navigation/ProtectedRoute'
+import ConfirmAccount from '@/pages/ConfirmAccount'
+import ResetPassword from '@/pages/ResetPassword'
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />,
     children: [
+      { path: 'auth/confirm', element: <ConfirmAccount /> },
+      { path: 'auth/reset', element: <ResetPassword /> },
       {
         index: true,
         element: (

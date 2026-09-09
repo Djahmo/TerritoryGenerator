@@ -12,13 +12,14 @@ const FileUpload: FC<FileUploadProps> = ({ onFile, accept = ".csv,.gpx", loading
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) onFile(file)
-  }, [onFile])
+    if (file && !loading) onFile(file)
+    e.target.value = ""
+  }, [onFile, loading])
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    if (e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
-  }, [onFile])
+    if (!loading && e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
+  }, [onFile, loading])
 
   return (
     <div
@@ -38,6 +39,7 @@ const FileUpload: FC<FileUploadProps> = ({ onFile, accept = ".csv,.gpx", loading
       <input
         id="territory-upload"
         type="file"
+        disabled={loading}
         accept={accept}
         onChange={handleFile}
         className="hidden"

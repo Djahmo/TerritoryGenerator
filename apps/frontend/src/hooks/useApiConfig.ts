@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { apiConfigService, UserConfig, UpdateUserConfigRequest } from '@/services/apiConfigService'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { ApiConfigService, UserConfig, UpdateUserConfigRequest } from '@/services/apiConfigService'
 import { useUser } from './useUser'
 
 const PAPER_WIDTH_CM = 29.7 // A4 width in cm (constant)
@@ -31,6 +31,7 @@ const getResolution = (
 
 export const useApiConfig = () => {
   const { user } = useUser()
+  const apiConfigService = useMemo(() => new ApiConfigService(), [])
   const [config, setConfig] = useState<UserConfig | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,13 +40,6 @@ export const useApiConfig = () => {
   const pendingUpdatesRef = useRef<UpdateUserConfigRequest>({})
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isFlushingRef = useRef(false)
-
-  // Charger la configuration au démarrage
-  useEffect(() => {
-    if (user && !config) {
-      loadConfig()
-    }
-  }, [user])
 
   // Nettoyer les timeouts au démontage
   useEffect(() => {
@@ -71,7 +65,11 @@ export const useApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, apiConfigService])
+
+  useEffect(() => {
+    if (user) void loadConfig()
+  }, [user, loadConfig])
 
   // Fonction pour flusher les updates en attente vers l'API
   const flushPendingUpdates = useCallback(async () => {
@@ -95,7 +93,7 @@ export const useApiConfig = () => {
     } finally {
       isFlushingRef.current = false
     }
-  }, [user, loadConfig])
+  }, [user, loadConfig, apiConfigService])
 
   // Fonction pour programmer un flush avec debounce
   const scheduleFlush = useCallback((debounceMs = 500) => {
@@ -157,7 +155,7 @@ export const useApiConfig = () => {
       }
       scheduleFlush()
     }
-  }, [user, config, loadConfig, scheduleFlush])
+  }, [user, config, loadConfig, scheduleFlush, apiConfigService])
 
   const resetConfig = useCallback(async () => {
     if (!user) return
@@ -182,7 +180,7 @@ export const useApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, apiConfigService])
 
   // Ajouter une couleur à la palette avec optimistic update
   const addColorToPalette = useCallback((color: string) => {

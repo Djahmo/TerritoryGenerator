@@ -1,3 +1,5 @@
+import { assertIgnUrl } from '../lib/secure/ign.js'
+
 /**
  * Effectue une requête avec retry automatique en cas d'échec
  */
@@ -6,9 +8,10 @@ export const fetchWithRetry = async (
   retries = 3,
   delay = 1000
 ): Promise<Response> => {
+  assertIgnUrl(url)
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
       if (!response.ok) {
         console.error(`NETWORK ERROR: Erreur HTTP ${response.status}: ${response.statusText}`)
         throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`)
@@ -60,6 +63,8 @@ export const buildIgnUrl = (
     format = 'image/png',
     crs = 'EPSG:4326'
   } = options
+
+  assertIgnUrl(baseUrl)
 
   // Pour WMS 1.3.0 avec EPSG:4326, les coordonnées sont dans l'ordre lat,lon
   // Pour les autres CRS (comme EPSG:3857), les coordonnées sont dans l'ordre lon,lat

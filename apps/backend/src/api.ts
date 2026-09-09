@@ -5,7 +5,7 @@ import { registerUserConfigRoutes } from './routes/userConfig.js'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import env from './env.js'
-import fastifyStatic from '@fastify/static'
+import { registerPrivateImageRoutes } from './routes/privateImages.js'
 import fastifyMultipart from '@fastify/multipart'
 
 const app = Fastify({
@@ -18,10 +18,7 @@ await app.register(cors, {
   origin: [env.FRONTEND_URL, env.FRONTEND_URL.replace('http', 'ws')],
   credentials: true,
 })
-await app.register(fastifyStatic, {
-  root: process.cwd()+env.STATIC_PATH,
-  prefix: '/p/',
-})
+await app.register(registerPrivateImageRoutes)
 
 await app.register(fastifyMultipart, {
   sharedSchemaId: 'file',

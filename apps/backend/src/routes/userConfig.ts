@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { isAllowedIgnUrl } from '../lib/secure/ign.js'
 import { getUserConfig, updateUserConfig, resetUserConfig } from '../db/index.js'
 import getAuthUser from '../lib/secure/auth.js'
 
@@ -25,7 +26,7 @@ const updateConfigSchema = z.object({
   ignApiRateLimit: z.number().min(10).max(1000).optional(),
 
   // Configuration API IGN
-  ignApiBaseUrl: z.string().url().optional(),
+  ignApiBaseUrl: z.string().url().refine(isAllowedIgnUrl, 'Only the official IGN WMS endpoint is allowed').optional(),
   ignApiLayer: z.string().optional(),
   ignApiFormat: z.string().optional(),
   ignApiCRS: z.string().optional()
@@ -75,7 +76,7 @@ export const registerUserConfigRoutes = (app: FastifyInstance) => {
 
     const parse = updateConfigSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     try {

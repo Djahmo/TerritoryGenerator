@@ -1,5 +1,5 @@
 import { FastifyRequest } from "fastify"
-import { getUserById } from "../../db/index.js"
+import { getUserById, getSessionByToken } from "../../db/index.js"
 import { verifyToken } from "./jwt.js"
 
 const getAuthUser = async (request: FastifyRequest) => {
@@ -7,9 +7,11 @@ const getAuthUser = async (request: FastifyRequest) => {
   if (!token) return null
 
   try {
-    const decoded = verifyToken(token)
+    const decoded = verifyToken(token, 'session')
+    const session = await getSessionByToken(token)
+    if (!session || session.userId !== decoded.userId || session.expiresAt <= new Date()) return null
     const user = await getUserById(decoded.userId)
-    return user || null
+    return user && !user.disabled ? user : null
   } catch {
     return null
   }

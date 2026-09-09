@@ -5,9 +5,9 @@ import { MAX_ZOOM, ZOOM_FACTOR } from "../utils/constants"
 
 // Hook for managing canvas state (objects, selection, zoom, pan, offset)
 
-export const useCanvasState = () => {
+export const useCanvasState = (initialObjects: DrawObject[] = []) => {
   // Objects state
-  const [objects, setObjects] = useState<DrawObject[]>([])
+  const [objects, setObjects] = useState<DrawObject[]>(initialObjects)
   const [selectedObjects, setSelectedObjects] = useState<number[]>([])
 
   // Canvas state

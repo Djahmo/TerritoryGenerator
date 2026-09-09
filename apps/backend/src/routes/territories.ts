@@ -1,3 +1,4 @@
+import { reconstructTerritoriesFromGpx } from '../utils/gpxParser.js'
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
@@ -11,7 +12,7 @@ import {
   saveTerritoryData,
   getTerritoryData,
   getReconstructedTerritories,
-  createTerritoryLayer,
+  saveTerritoryLayers,
   deleteTerritoryLayersByTerritory,
   getImageFileName,
   getImageFilePath
@@ -19,11 +20,8 @@ import {
 import { getUserConfig } from '../db/userConfig/index.js'
 import getAuthUser from '../lib/secure/auth.js'
 import { promises as fs } from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { territoryNumberSchema, imageTypeSchema, getUserDirectory, resolveWithin, resolveImagePath } from '../lib/secure/imagePaths.js'
+import { imageRoot } from '../lib/secure/storage.js'
 
 // Schémas de validation
 const coordSchema = z.object({
@@ -32,7 +30,7 @@ const coordSchema = z.object({
 })
 
 const territorySchema = z.object({
-  num: z.string(),
+  num: territoryNumberSchema,
   polygon: z.array(coordSchema),
   name: z.string(),
   rotation: z.number().optional(),
@@ -52,13 +50,13 @@ const generateImageWithCropSchema = z.object({
   territory: territorySchema,
   customBbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
   cropData: z.object({
-    x: z.number(),
-    y: z.number(),
-    width: z.number(),
-    height: z.number(),
-    imageWidth: z.number(),
-    imageHeight: z.number()
-  }).optional(),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    width: z.number().positive().max(1),
+    height: z.number().positive().max(1),
+    imageWidth: z.number().positive(),
+    imageHeight: z.number().positive()
+  }).refine(crop => crop.x + crop.width <= 1.000001 && crop.y + crop.height <= 1.000001, 'Recadrage hors de l’image').optional(),
   options: z.object({
     contourColor: z.string().optional(),
     contourWidth: z.number().optional()
@@ -66,7 +64,7 @@ const generateImageWithCropSchema = z.object({
 })
 
 const saveTerritoryDataSchema = z.object({
-  gpxData: z.string()
+  gpxData: z.string().refine(value => reconstructTerritoriesFromGpx(value).length > 0, 'GPX invalide ou vide')
 })
 
 const updateTerritoryCompleteSchema = z.object({
@@ -84,7 +82,7 @@ const updateTerritoryCompleteSchema = z.object({
 
 // Schémas pour les routes de layers
 const layerSchema = z.object({
-  territoryNumber: z.string(),
+  territoryNumber: territoryNumberSchema,
   imageType: z.enum(['standard', 'large']),
   visible: z.boolean().optional(),
   locked: z.boolean().optional(),
@@ -101,6 +99,13 @@ const updateLayerSchema = z.object({
 })
 
 export const registerTerritoryRoutes = (app: FastifyInstance) => {
+  app.addHook('preValidation', async (request, reply) => {
+    const params = request.params as { territoryNumber?: string; imageType?: string } | undefined
+    if (params?.territoryNumber !== undefined && !territoryNumberSchema.safeParse(params.territoryNumber).success
+      || params?.imageType !== undefined && !imageTypeSchema.safeParse(params.imageType).success) {
+      return reply.status(400).send({ error: 'Invalid image identifier' })
+    }
+  })
   // Route pour générer une image de territoire
   app.post('/generate-image', async (request, reply) => {
     const user = await getAuthUser(request)
@@ -110,7 +115,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = generateImageSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ success: false, errors: parse.error.errors })
+      return reply.status(400).send({ success: false, errors: parse.error.issues })
     }
 
     try {
@@ -206,12 +211,12 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
         imageData = result.image;
 
         // Créer le dossier utilisateur
-        const userDir = path.join(__dirname, '../../public', userId);
+        const userDir = getUserDirectory(imageRoot, userId);
         await fs.mkdir(userDir, { recursive: true }); const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
 
         // 1. Sauvegarder l'image ORIGINALE (copie de l'image générée)
         const originalFileName = getImageFileName(territory.num, 'original');
-        const originalFilePath = path.join(userDir, originalFileName);
+        const originalFilePath = resolveWithin(userDir, originalFileName);
         const originalBuffer = Buffer.from(base64Data, 'base64');
         await fs.writeFile(originalFilePath, originalBuffer);
 
@@ -224,7 +229,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
           rotation: territory.rotation
         });        // 2. Sauvegarder l'image STANDARD (copie du fichier original pour éviter la corruption)
         const standardFileName = getImageFileName(territory.num, 'standard');
-        const standardFilePath = path.join(userDir, standardFileName);
+        const standardFilePath = resolveWithin(userDir, standardFileName);
         await fs.copyFile(originalFilePath, standardFilePath);
 
         await createTerritoryImage({
@@ -249,7 +254,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             .webp({ quality: 80 })
             .toBuffer();
 
-          const thumbnailPath = path.join(userDir, thumbnailFileName);
+          const thumbnailPath = resolveWithin(userDir, thumbnailFileName);
           await fs.writeFile(thumbnailPath, webpBuffer);          // Sauvegarder les métadonnées de la miniature
           await createTerritoryImage({
             userId,
@@ -260,18 +265,19 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
           });
         }
 
+        await deleteTerritoryLayersByTerritory(userId, territory.num, 'standard');
         return reply.send({ success: true });
       } else if (imageType === 'large') {
         const imageResult = await imageService.generateLargeImage(territory, options);
         imageData = imageResult.dataUrl;
 
         // Créer le dossier utilisateur
-        const userDir = path.join(__dirname, '../../public', userId);
+        const userDir = getUserDirectory(imageRoot, userId);
         await fs.mkdir(userDir, { recursive: true }); const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
 
         // 1. Sauvegarder l'image ORIGINALE LARGE (copie de l'image générée)
         const originalLargeFileName = getImageFileName(territory.num, 'originalLarge');
-        const originalLargeFilePath = path.join(userDir, originalLargeFileName);
+        const originalLargeFilePath = resolveWithin(userDir, originalLargeFileName);
         const originalLargeBuffer = Buffer.from(base64Data, 'base64');
         await fs.writeFile(originalLargeFilePath, originalLargeBuffer);        await createTerritoryImage({
           userId,
@@ -285,7 +291,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
         // 2. Sauvegarder l'image LARGE (copie du fichier originalLarge pour éviter la corruption)
         const largeFileName = getImageFileName(territory.num, 'large');
-        const largeFilePath = path.join(userDir, largeFileName);
+        const largeFilePath = resolveWithin(userDir, largeFileName);
         await fs.copyFile(originalLargeFilePath, largeFilePath);        await createTerritoryImage({
           userId,
           territoryNumber: territory.num,
@@ -312,7 +318,9 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             }
             await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
-        }        return reply.send({ success: true });
+        }
+        await deleteTerritoryLayersByTerritory(userId, territory.num, 'large');
+        return reply.send({ success: true });
       } else {
         return reply.status(400).send({ success: false, error: 'Type d\'image non supporté' })
       }
@@ -335,7 +343,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = generateImageWithCropSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }    try {      const { territory, customBbox, cropData, options = {} } = parse.data
       const userId = user.id
       let finalBbox = customBbox
@@ -344,7 +352,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
         // Récupérer l'image originalLarge existante pour connaître son bbox
         const existingImage = await getTerritoryImage(userId, territory.num, 'originalLarge')
 
-        if (existingImage.length > 0 && existingImage[0].bbox) {
+        if (!existingImage[0]?.bbox) return reply.status(409).send({ error: 'Régénérez le plan large avant de le recadrer : ses coordonnées sont manquantes.' })
+        if (existingImage[0].bbox) {
           const currentBbox = JSON.parse(existingImage[0].bbox) as [number, number, number, number]
 
           const [minLon, minLat, maxLon, maxLat] = currentBbox
@@ -441,14 +450,14 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       )
 
       // Créer le dossier utilisateur
-      const userDir = path.join(__dirname, '../../public', userId)
+      const userDir = getUserDirectory(imageRoot, userId)
       await fs.mkdir(userDir, { recursive: true });
 
       const base64Data = croppedImageResult.dataUrl.replace(/^data:image\/png;base64,/, '')
 
       // 1. Sauvegarder l'image ORIGINALE LARGE (copie de l'image générée avec crop)
       const originalLargeFileName = getImageFileName(territory.num, 'originalLarge');
-      const originalLargeFilePath = path.join(userDir, originalLargeFileName);
+      const originalLargeFilePath = resolveWithin(userDir, originalLargeFileName);
       const originalLargeBuffer = Buffer.from(base64Data, 'base64');
       await fs.writeFile(originalLargeFilePath, originalLargeBuffer);      await createTerritoryImage({
         userId,
@@ -462,7 +471,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
       // 2. Sauvegarder l'image LARGE (copie du fichier originalLarge pour éviter la corruption)
       const largeFileName = getImageFileName(territory.num, 'large');
-      const largeFilePath = path.join(userDir, largeFileName);
+      const largeFilePath = resolveWithin(userDir, largeFileName);
       await fs.copyFile(originalLargeFilePath, largeFilePath);      await createTerritoryImage({
         userId,
         territoryNumber: territory.num,
@@ -492,6 +501,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
         }
       }
 
+      await deleteTerritoryLayersByTerritory(userId, territory.num, 'large');
       return reply.send({
         success: true
       })
@@ -521,7 +531,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
         success: true,
         images: images.map(img => ({
           ...img,
-          imageUrl: `/p/${userId}/${getImageFileName(img.territoryNumber, img.imageType)}`
+          imageUrl: `/p${getImageFilePath(userId, img.territoryNumber, img.imageType)}`
         }))
       })
 
@@ -547,8 +557,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       const image = await getTerritoryImage(userId, territoryNumber, imageType);
 
       if (image.length > 0) {
-        const imagePath = getImageFilePath(userId, territoryNumber, imageType);
-        const filePath = path.join(__dirname, '../../public', imagePath);
+        const filePath = resolveImagePath(imageRoot, userId, territoryNumber, imageType);
         try {
           await fs.unlink(filePath);
         } catch (err) {
@@ -581,8 +590,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = saveTerritoryDataSchema.safeParse(request.body)
     if (!parse.success) {
-      console.error('❌ Erreur de validation:', parse.error.errors)
-      return reply.status(400).send({ errors: parse.error.errors })
+      console.error('❌ Erreur de validation:', parse.error.issues)
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     try {
@@ -667,7 +676,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = updateTerritoryCompleteSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     try {
@@ -679,7 +688,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       if (territory.num !== territoryNumber) {
         return reply.status(400).send({ error: 'Le numéro de territoire ne correspond pas' })
       }      // Créer le dossier utilisateur
-      const userDir = path.join(__dirname, '../../public', userId);
+      const userDir = getUserDirectory(imageRoot, userId);
       await fs.mkdir(userDir, { recursive: true });
 
       // 1. Sauvegarder les images (et supprimer les anciennes)
@@ -692,7 +701,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
             const standardFileName = getImageFileName(territoryNumber, 'standard')
-            const filePath = path.join(userDir, standardFileName)
+            const filePath = resolveWithin(userDir, standardFileName)
 
             await fs.writeFile(filePath, imageBuffer)
 
@@ -713,7 +722,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             const base64Data = images.large!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
             const largeFileName = getImageFileName(territoryNumber, 'large')
-            const filePath = path.join(userDir, largeFileName)
+            const filePath = resolveWithin(userDir, largeFileName)
 
             await fs.writeFile(filePath, imageBuffer)
 
@@ -757,7 +766,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
               .toBuffer();
 
             const miniatureFileName = getImageFileName(territoryNumber, 'miniature');
-            const filePath = path.join(userDir, miniatureFileName);
+            const filePath = resolveWithin(userDir, miniatureFileName);
             await fs.writeFile(filePath, webpBuffer);
 
             await createTerritoryImage({
@@ -773,7 +782,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             try {
               const imageBuffer = Buffer.from(base64Data, 'base64')
               const fallbackFileName = getImageFileName(territoryNumber, 'miniature')
-              const fallbackPath = path.join(userDir, fallbackFileName)
+              const fallbackPath = resolveWithin(userDir, fallbackFileName)
 
               await fs.writeFile(fallbackPath, imageBuffer)
 
@@ -795,58 +804,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
       // Attendre que toutes les images soient sauvegardées
       await Promise.all(imagePromises)      // 2. Sauvegarder les layers (et supprimer les anciens)
-      const layerPromises = []
-
-      if (layers.paintLayersImage && layers.paintLayersImage.length > 0) {
-        layerPromises.push(
-          (async () => {
-            // Supprimer tous les anciens layers de ce territoire et type d'image
-            await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'standard')
-
-            // Ajouter les nouveaux layers
-            const paintLayers = layers.paintLayersImage!
-            for (const layer of paintLayers) {
-              await createTerritoryLayer({
-                userId,
-                territoryNumber,
-                imageType: 'standard',
-                layerType: layer.type,
-                layerData: JSON.stringify(layer.data),
-                style: JSON.stringify(layer.style),
-                visible: layer.visible,
-                locked: layer.locked
-              })
-            }
-          })()
-        )
-      }
-
-      if (layers.paintLayersLarge && layers.paintLayersLarge.length > 0) {
-        layerPromises.push(
-          (async () => {
-            // Supprimer tous les anciens layers de ce territoire et type d'image
-            await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'large')
-
-            // Ajouter les nouveaux layers
-            const paintLayers = layers.paintLayersLarge!
-            for (const layer of paintLayers) {
-              await createTerritoryLayer({
-                userId,
-                territoryNumber,
-                imageType: 'large',
-                layerType: layer.type,
-                layerData: JSON.stringify(layer.data),
-                style: JSON.stringify(layer.style),
-                visible: layer.visible,
-                locked: layer.locked
-              })
-            }
-          })()
-        )
-      }
-
-      // Attendre que tous les layers soient sauvegardés
-      await Promise.all(layerPromises)
+      if (layers.paintLayersImage) await saveTerritoryLayers(userId, territoryNumber, 'standard', layers.paintLayersImage)
+      if (layers.paintLayersLarge) await saveTerritoryLayers(userId, territoryNumber, 'large', layers.paintLayersLarge)
 
       return reply.send({
         success: true,
@@ -871,7 +830,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = updateTerritoryCompleteSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     try {
@@ -880,7 +839,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       const userId = user.id
 
       // Créer le dossier utilisateur
-      const userDir = path.join(__dirname, '../../public', userId);
+      const userDir = getUserDirectory(imageRoot, userId);
       await fs.mkdir(userDir, { recursive: true });
 
       // Sauvegarder UNIQUEMENT l'image standard et la miniature
@@ -892,7 +851,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             const base64Data = images.image!.replace(/^data:image\/png;base64,/, '')
             const imageBuffer = Buffer.from(base64Data, 'base64')
             const standardFileName = getImageFileName(territoryNumber, 'standard')
-            const filePath = path.join(userDir, standardFileName)
+            const filePath = resolveWithin(userDir, standardFileName)
             await fs.writeFile(filePath, imageBuffer)
             await createTerritoryImage({
               userId,
@@ -924,7 +883,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
             const imageBuffer = Buffer.from(base64Data, 'base64')
             const webpBuffer = await sharp(imageBuffer).webp({ quality: 80 }).toBuffer();
             const miniatureFileName = getImageFileName(territoryNumber, 'miniature');
-            const filePath = path.join(userDir, miniatureFileName);
+            const filePath = resolveWithin(userDir, miniatureFileName);
             await fs.writeFile(filePath, webpBuffer);
             await createTerritoryImage({
               userId,
@@ -940,22 +899,8 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       await Promise.all(imagePromises)
 
       // Sauvegarder UNIQUEMENT les layers standard
-      if (layers.paintLayersImage) {
-        await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'standard')
-        const paintLayers = layers.paintLayersImage
-        for (const layer of paintLayers) {
-          await createTerritoryLayer({
-            userId,
-            territoryNumber,
-            imageType: 'standard',
-            layerType: layer.type,
-            layerData: JSON.stringify(layer.data),
-            style: JSON.stringify(layer.style),
-            visible: layer.visible,
-            locked: layer.locked
-          })
-        }
-      }
+      if (layers.paintLayersImage) await saveTerritoryLayers(userId, territoryNumber, 'standard', layers.paintLayersImage)
+
       return reply.send({ success: true, message: 'Données standard sauvegardées' })
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde standard:', error)
@@ -975,7 +920,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
 
     const parse = updateTerritoryCompleteSchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     try {
@@ -984,7 +929,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       const userId = user.id
 
       // Créer le dossier utilisateur
-      const userDir = path.join(__dirname, '../../public', userId);
+      const userDir = getUserDirectory(imageRoot, userId);
       await fs.mkdir(userDir, { recursive: true });
 
       // Sauvegarder UNIQUEMENT l'image large
@@ -992,7 +937,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
         const base64Data = images.large.replace(/^data:image\/png;base64,/, '')
         const imageBuffer = Buffer.from(base64Data, 'base64')
         const largeFileName = getImageFileName(territoryNumber, 'large')
-        const filePath = path.join(userDir, largeFileName)
+        const filePath = resolveWithin(userDir, largeFileName)
         await fs.writeFile(filePath, imageBuffer)
         await createTerritoryImage({
           userId,
@@ -1003,22 +948,7 @@ export const registerTerritoryRoutes = (app: FastifyInstance) => {
       }
 
       // Sauvegarder UNIQUEMENT les layers large
-      if (layers.paintLayersLarge) {
-        await deleteTerritoryLayersByTerritory(userId, territoryNumber, 'large')
-        const paintLayers = layers.paintLayersLarge
-        for (const layer of paintLayers) {
-          await createTerritoryLayer({
-            userId,
-            territoryNumber,
-            imageType: 'large',
-            layerType: layer.type,
-            layerData: JSON.stringify(layer.data),
-            style: JSON.stringify(layer.style),
-            visible: layer.visible,
-            locked: layer.locked
-          })
-        }
-      }
+      if (layers.paintLayersLarge) await saveTerritoryLayers(userId, territoryNumber, 'large', layers.paintLayersLarge)
 
       return reply.send({ success: true, message: 'Données large sauvegardées' })
     } catch (error) {

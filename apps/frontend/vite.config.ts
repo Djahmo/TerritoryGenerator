@@ -18,7 +18,7 @@ const aliasEntries = {
 const resolveAlias = Object.fromEntries(
   Object.entries(aliasEntries).map(([alias, target]) => [
     alias,
-    path.resolve(__dirname, target),
+    path.resolve(import.meta.dirname, target),
   ])
 )
 
@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: true,
     port: 5173,
-    https: mode === "web" ? {} : false,
+    https: mode === "web" ? {} : undefined,
     proxy: {
       '/api': {
         target: 'http://localhost:3002',
@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => ({
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
   },
-  plugins: [react(), Unocss(), mkcert()],
+  plugins: [react(), Unocss(), ...(mode === "web" ? [mkcert()] : [])],
   resolve: {
     alias: resolveAlias,
   }

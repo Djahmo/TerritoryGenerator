@@ -1,3 +1,5 @@
+import { accountFetch, getAccountScope } from './accountScope'
+
 export interface UserConfig {
   id: string
   userId: string
@@ -64,14 +66,15 @@ export interface UserConfigResponse {
   message?: string
 }
 
-class ApiConfigService {
+export class ApiConfigService {
+  private readonly accountScope = getAccountScope()
   private baseUrl = '/api'
   /**
    * Récupérer la configuration de l'utilisateur
    */
   async getUserConfig(): Promise<UserConfig> {
     try {
-      const response = await fetch(`${this.baseUrl}/user-config`, {
+      const response = await accountFetch(this.accountScope, `${this.baseUrl}/user-config`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -95,7 +98,7 @@ class ApiConfigService {
    */
   async updateUserConfig(updates: UpdateUserConfigRequest): Promise<UserConfig> {
     try {
-      const response = await fetch(`${this.baseUrl}/user-config`, {
+      const response = await accountFetch(this.accountScope, `${this.baseUrl}/user-config`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -120,7 +123,7 @@ class ApiConfigService {
    */
   async resetUserConfig(): Promise<UserConfig> {
     try {
-      const response = await fetch(`${this.baseUrl}/user-config/reset`, {
+      const response = await accountFetch(this.accountScope, `${this.baseUrl}/user-config/reset`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -140,5 +143,3 @@ class ApiConfigService {
     }
   }
 }
-
-export const apiConfigService = new ApiConfigService()

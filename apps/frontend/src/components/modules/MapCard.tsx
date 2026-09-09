@@ -1,13 +1,12 @@
 import type { Territory } from "%/types/"
 import { useTranslation } from "react-i18next"
-import { FC, useState } from "react"
+import { FC, useState, useEffect } from "react"
 import { Check } from "lucide-react"
 import { Link } from "react-router"
-import { addImageTimestamp } from "@/utils"
 
 type MapCardProps = {
   territory: Territory
-  onRename?: (num:string, name: string) => void
+  onRename?: (num:string, name: string) => Promise<void>
   visible?: boolean
 }
 
@@ -18,11 +17,17 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
   const [editMode, setEditMode] = useState(false)
   const [inputName, setInputNom] = useState(name || "")
 
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { if (!editMode) setInputNom(name || '') }, [name, editMode])
+
   if (!miniature) return null
 
-  const handleValidate = () => {
-    setEditMode(false)
-    if (onRename) onRename(num, inputName)
+  const handleValidate = async () => {
+    if (saving) return
+    setSaving(true)
+    try { await onRename?.(num, inputName); setEditMode(false) }
+    catch { /* Keep the edited value so the user can retry. */ }
+    finally { setSaving(false) }
   }
 
   return (
@@ -47,12 +52,12 @@ const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
             onKeyDown={e => e.key === "Enter" && handleValidate()}
             autoFocus
           />
-          <button onClick={handleValidate} className="ml-1 text-success hover:text-success-hover transition cursor-pointer">
+          <button disabled={saving} onClick={handleValidate} className="ml-1 text-success hover:text-success-hover transition cursor-pointer">
             <Check size={18} strokeWidth={3} />
           </button>
         </div>
-      )}      <Link to={"/territory/"+num} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">        <img
-          src={addImageTimestamp(miniature)}
+      )}      <Link to={"/territory/"+encodeURIComponent(num)} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">        <img
+          src={miniature}
           alt={`Territoire ${num}`}
           className={`object-contain w-full h-full transition-opacity duration-300 `}
         />

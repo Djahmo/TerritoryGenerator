@@ -30,7 +30,7 @@ export const drawCursorPreview = (ctx: CanvasRenderingContext2D, toolType: ToolT
 
 export const renderCanvas = (ctx: CanvasRenderingContext2D, objects: DrawObject[], selectedIndices: number[] = []): void => {
   objects.forEach((obj) => {
-    drawToolShape(ctx, obj);
+    if (obj.visible !== false) drawToolShape(ctx, obj);
   });
 
   // Ajouter les effets de sélection par-dessus

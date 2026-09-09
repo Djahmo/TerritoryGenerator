@@ -1,31 +1,30 @@
 {
   "compilerOptions": {
     /* Base options */
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
       "§/*": [
-        "src/pages/*"
+        "./src/pages/*"
       ],
       "#/*": [
-        "src/components/*"
+        "./src/components/*"
       ],
       "$/*": [
-        "src/components/modules/*"
+        "./src/components/modules/*"
       ],
       "£/*": [
-        "src/layouts/*"
+        "./src/layouts/*"
       ],
       "µ/*": [
-        "src/modules/*"
+        "./src/modules/*"
       ],
       "&/*": [
-        "src/hooks/*"
+        "./src/hooks/*"
       ],
       "%/*": [
-        "src/utils/*"
+        "./src/utils/*"
       ]
     },
     /* Build options */
@@ -38,6 +37,7 @@
       "DOM.Iterable"
     ],
     "module": "ESNext",
+    "types": ["vite/client", "node"],
     "skipLibCheck": true,
     /* Bundler mode */
     "moduleResolution": "bundler",

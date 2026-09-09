@@ -21,7 +21,9 @@ import Cropper from './components/Cropper';
 interface PaintProps {
   src?: string;
   layers?: PaintLayer[];
-  onSave?: (layers: PaintLayer[], compositeImage?: string) => void;
+  onSave?: (layers: PaintLayer[], compositeImage?: string) => Promise<void>;
+  onChange?: (layers: PaintLayer[]) => void;
+  dirty?: boolean;
   onCrop?: (cropData: {
     x: number;
     y: number;
@@ -35,7 +37,9 @@ interface PaintProps {
   territory?: Territory; // Objet territoire complet (optionnel)
 }
 
-const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = false, territory }) => {
+const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = false, onCrop, isLarge = false, territory }) => {
+  const initialObjects = useRef((layers ?? []).map(LayerService.convertLayerToDrawObject).filter((obj): obj is DrawObject => obj !== null));
+  const [saving, setSaving] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
@@ -61,7 +65,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     handlePanStart,
     handlePanMove,
     handlePanEnd
-  } = useCanvasState();
+  } = useCanvasState(initialObjects.current);
 
   const {
     addToHistory,
@@ -102,36 +106,21 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     setDragOffset
   } = useDrawingState();
 
+  const lastObjects = useRef(initialObjects.current);
   const [textInputScreenPos, setTextInputScreenPos] = useState<Point | null>(null);
-  const [currentMode, setCurrentMode] = useState<{ isLarge: boolean; layersLoaded: boolean }>({
-    isLarge: false,
-    layersLoaded: false
-  });
+  useEffect(() => {
+    if (objects !== lastObjects.current) {
+      lastObjects.current = objects;
+      onChange?.(objects.map(LayerService.convertDrawObjectToLayer).filter((layer): layer is PaintLayer => layer !== null));
+    }
+  }, [objects, onChange]);
 
   useEffect(() => {
-    if (currentMode.isLarge !== isLarge) {
-      setCurrentMode({ isLarge, layersLoaded: false });
-      setObjects([]);
-    }
-
-    const shouldLoadLayers = layers && layers.length > 0 &&
-      (!currentMode.layersLoaded || currentMode.isLarge !== isLarge);
-
-    if (shouldLoadLayers) {
-      const drawObjects = layers
-        .map(LayerService.convertLayerToDrawObject)
-        .filter((obj): obj is DrawObject => obj !== null);
-
-      setObjects(drawObjects);
-      addToHistory(drawObjects);
-      setCurrentMode({ isLarge, layersLoaded: true });
-    } else if (!layers || layers.length === 0) {
-      setCurrentMode({ isLarge, layersLoaded: false });
-      if (objects.length === 0) {
-        setObjects([]);
-      }
-    }
-  }, [layers, setObjects, addToHistory, isLarge]);
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -222,6 +211,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     };
 
     img.src = src;
+    return () => { img.onload = null; img.onerror = null; };
   }, [src, setCanvasDims, setImg, setZoom, setZoomMin, setOffset]);
 
   useEffect(() => {
@@ -331,7 +321,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     ctx.restore();
   }, [objects, selectedObjects, zoom, offset, isDrawing, startPoint, cursorPosition, currentShape, selectedTool, selectedColor, strokeWidth, img, isDragging, draggedObjects, dragOffset]);
 
-  const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Point => {
+  const getMousePos = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
@@ -357,7 +347,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     return canvasWorldToScreen({ x: worldX, y: worldY }, canvas, transformParams);
   }, [canvasDims, offset, zoom]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (saving) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -431,9 +422,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
     } else {
       setCurrentShape(newShape);
     }
-  }, [selectedTool, selectedColor, secondaryColor, strokeWidth, fontSize, objects, selectedObjects, getMousePos, setIsDrawing, setStartPoint, setCurrentShape, setObjects, addToHistory, setTextInput, setShowTextInput, worldToScreen, setTextInputScreenPos, setIsDragging, setDraggedObjects, setDragOffset]);
+  }, [saving, isLarge, territory, selectedTool, selectedColor, secondaryColor, strokeWidth, fontSize, objects, selectedObjects, getMousePos, setIsDrawing, setStartPoint, setCurrentShape, setObjects, addToHistory, setTextInput, setShowTextInput, worldToScreen, setTextInputScreenPos, setIsDragging, setDraggedObjects, setDragOffset]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.stopPropagation();
 
     const point = getMousePos(e);
@@ -580,7 +571,8 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
   }, [objects, selectedObjects, setObjects, setSelectedObjects, addToHistory]);
 
   const handleExport = useCallback(async () => {
-    if (!onSave) return;
+    if (!onSave || saving || !img) return;
+    setSaving(true);
 
     try {
       const paintLayers = objects
@@ -589,7 +581,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
 
       const canvas = canvasRef.current;
       if (!canvas) {
-        onSave(paintLayers);
+        await onSave(paintLayers);
         return;
       }
 
@@ -606,20 +598,16 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
       }
 
       objects.forEach((obj) => {
-        if (obj.type === 'selection') return;
+        if (obj.type === 'selection' || obj.visible === false) return;
         drawToolShape(tempCtx, obj);
       });
 
       const compositeImage = tempCanvas.toDataURL('image/png');
-      onSave(paintLayers, compositeImage);
+      await onSave(paintLayers, compositeImage);
     } catch (error) {
       console.error('[Paint] Error exporting canvas:', error);
-      const paintLayers = objects
-        .map(LayerService.convertDrawObjectToLayer)
-        .filter((layer): layer is PaintLayer => layer !== null);
-      onSave(paintLayers);
-    }
-  }, [onSave, objects, img, canvasDims]);
+    } finally { setSaving(false); }
+  }, [onSave, objects, img, canvasDims, saving]);
 
   const handleHistoryChange = useCallback((newObjects: DrawObject[] | null) => {
     if (newObjects !== null) {
@@ -652,7 +640,7 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (showTextInput) return;
+      if (showTextInput || saving || (e.target instanceof HTMLElement && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)))) return;
 
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
@@ -683,25 +671,34 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showTextInput, canUndo, canRedo, handleUndo, handleRedo, selectedObjects, handleClear, setSelectedObjects, setSelectedTool]);
+  }, [showTextInput, saving, canUndo, canRedo, handleUndo, handleRedo, selectedObjects, handleClear, setSelectedObjects, setSelectedTool]);
 
   return (
-    <div className="flex w-full h-full min-w-0">
+    <div className="flex w-full h-full min-w-0 relative" data-testid="paint">
+      {saving && <div className="absolute inset-0 z-50 bg-black/30 flex items-center justify-center text-white">Sauvegarde…</div> }
       <div className="flex-1 flex flex-col relative min-w-0">
         <div ref={containerRef} className="flex-1 relative overflow-hidden">
           <canvas
             ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={() => setCursorPosition(null)}
-            onContextMenu={(e) => e.preventDefault()}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
+            onPointerDown={e => {
+              if (saving || !e.isPrimary) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              if (e.button === 1 || (e.button === 0 && e.ctrlKey)) handlePointerDown(e);
+              else handleMouseDown(e);
+            }}
+            onPointerMove={e => { if (!e.isPrimary) return; if (isPanning) handlePointerMove(e); else handleMouseMove(e); }}
+            onPointerUp={e => {
+              if (!e.isPrimary) return;
+              if (isPanning) handlePointerUp(); else handleMouseUp();
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onPointerCancel={() => { handlePointerUp(); setIsDrawing(false); setCurrentShape(null); setIsDragging(false); }}
+            onPointerLeave={() => { if (!isDrawing && !isDragging) setCursorPosition(null); }}
+            onContextMenu={e => e.preventDefault()}
             onWheel={handleWheelEvent}
             className="border-r border-gray-300 w-full"
             style={{
+              touchAction: 'none',
               cursor: getCursorStyle(),
               display: 'block',
               maxWidth: 'none',
@@ -771,6 +768,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onCrop, isLarge = fa
           onRedo={handleRedo}
           onClear={handleClear}
           onExport={handleExport}
+          saving={saving}
+          canSave={!!img}
+          dirty={dirty}
           isLarge={isLarge}
           onGoCrop={() => setOnCropping(true)}
         />

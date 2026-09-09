@@ -5,24 +5,18 @@ import type { DrawObject } from '../components/modules/paint/utils/types'
  * Service de conversion entre DrawObjects et PaintLayers
  */
 export class LayerService {
-  /**
-   * Génère un ID unique pour un layer
-   */
-  private static generateLayerId(type: string): string {
-    return `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  }
-
   static convertDrawObjectToLayer(drawObject: DrawObject): PaintLayer | null {
-    if (!drawObject) return null
+    if (!drawObject || drawObject.type === 'selection') return null
     const baseLayer = {
-      id: LayerService.generateLayerId(drawObject.type),
+      id: drawObject.id || crypto.randomUUID(),
       type: drawObject.type as PaintLayer['type'],
-      visible: true,
-      locked: false,
-      timestamp: Date.now(),
+      visible: drawObject.visible ?? true,
+      locked: drawObject.locked ?? false,
+      timestamp: drawObject.timestamp ?? 0,
+      name: drawObject.name,
       style: {
-        color: (drawObject as any).color || '#000000',
-        strokeWidth: (drawObject as any).strokeWidth || 2
+        color: drawObject.color || '#000000',
+        strokeWidth: 'strokeWidth' in drawObject ? drawObject.strokeWidth : 2
       }
     }
 
@@ -56,7 +50,7 @@ export class LayerService {
           }
         } as PaintLayer
 
-      case 'circle':
+      case 'circle': {
         const centerX = (drawObject.startX + drawObject.endX) / 2
         const centerY = (drawObject.startY + drawObject.endY) / 2
         const radiusX = Math.abs(drawObject.endX - drawObject.startX) / 2
@@ -71,6 +65,7 @@ export class LayerService {
           }
         } as PaintLayer
 
+      }
       case 'rectangle':
         return {
           ...baseLayer,
@@ -88,7 +83,7 @@ export class LayerService {
           data: {
             position: { x: drawObject.x, y: drawObject.y },
             content: drawObject.content || '',
-            fontSize: (drawObject as any).fontSize || 16
+            fontSize: drawObject.fontSize || 16
           }
         } as PaintLayer
 
@@ -107,7 +102,7 @@ export class LayerService {
           type: 'compass',
           data: {
             position: { x: drawObject.x, y: drawObject.y },
-            rotation: (drawObject as any).rotation || 0
+            rotation: drawObject.rotation || 0
           }
         } as PaintLayer
 
@@ -122,6 +117,11 @@ export class LayerService {
     if (!layer) return null
 
     const baseObject = {
+      id: layer.id,
+      visible: layer.visible,
+      locked: layer.locked,
+      timestamp: layer.timestamp,
+      name: layer.name,
       type: layer.type,
       color: layer.style.color,
       strokeWidth: layer.style.strokeWidth || 2
@@ -155,7 +155,7 @@ export class LayerService {
           endY: layer.data.endPoint.y
         } as DrawObject
 
-      case 'circle':
+      case 'circle': {
         const radiusX = layer.data.radiusX
         const radiusY = layer.data.radiusY
         return {
@@ -166,6 +166,7 @@ export class LayerService {
           endX: layer.data.center.x + radiusX,
           endY: layer.data.center.y + radiusY
         } as DrawObject
+      }
       case 'rectangle':
         return {
           ...baseObject,
@@ -180,18 +181,16 @@ export class LayerService {
         return {
           ...baseObject,
           type: 'text',
-          id: `text_${Date.now()}`,
           x: layer.data.position.x,
           y: layer.data.position.y,
           content: layer.data.content,
-          fontSize: (layer.data as any).fontSize || 16
+          fontSize: layer.data.fontSize || 16
         } as DrawObject
 
       case 'parking':
         return {
           ...baseObject,
           type: 'parking',
-          id: `parking_${Date.now()}`,
           x: layer.data.position.x,
           y: layer.data.position.y
         } as DrawObject
@@ -200,7 +199,6 @@ export class LayerService {
         return {
           ...baseObject,
           type: 'compass',
-          id: `compass_${Date.now()}`,
           x: layer.data.position.x,
           y: layer.data.position.y,
           rotation: layer.data.rotation || 0

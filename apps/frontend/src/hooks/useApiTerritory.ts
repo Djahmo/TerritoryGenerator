@@ -1,16 +1,16 @@
-// Fichier temporaire avec les corrections de syntaxe
-
-import { useEffect } from "react"
+import { useEffect, useCallback } from "react"
 import { create } from "zustand"
 import type { Territory, TerritoryCache, PaintLayer } from "%/types"
 import { ApiTerritoryService } from "../services/apiTerritoryService"
 
-// Service API pour les territoires
-const apiService = new ApiTerritoryService();
+import { makeGpx } from '../utils/territoryFiles'
+import { useUser } from './useUser'
+import { getAccountScope, isAccountScopeCurrent } from '../services/accountScope'
 
 type State = {
   cache: TerritoryCache | null;
   loading: boolean;
+  renameTerritory: (num: string, name: string) => Promise<void>;
   setCache: (cache: TerritoryCache | null) => void;
   updateTerritories: (territories: Territory[]) => void;
   updateGpx: (gpx: string) => void;
@@ -23,10 +23,30 @@ type State = {
   loadFromBackend: () => Promise<void>;
 };
 
+let renameQueue: Promise<void> = Promise.resolve();
+
 export const useApiTerritoryStore = create<State>((set, get) => ({
   cache: null,
   loading: true,
 
+  renameTerritory: (num, name) => {
+    const scope = getAccountScope();
+    const api = new ApiTerritoryService();
+    const operation = renameQueue.catch(() => {}).then(async () => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      const current = get().cache;
+      if (!current) throw new Error('Territoires non chargés');
+      if (!current.territories.some(t => t.num === num)) throw new Error('Territoire introuvable');
+      const territories = current.territories.map(t => t.num === num ? { ...t, name } : t);
+      const gpx = makeGpx(territories);
+      await api.saveTerritoryData(gpx);
+      if (!isAccountScopeCurrent(scope)) return;
+      const latest = get().cache;
+      if (latest) set({ cache: { ...latest, territories: latest.territories.map(t => t.num === num ? { ...t, name } : t), gpx, lastUpdate: Date.now() } });
+    });
+    renameQueue = operation;
+    return operation;
+  },
   setCache: (cache) => {
     set({ cache });
   },
@@ -41,9 +61,7 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
     };
     set({ cache: newCache });
 
-    if (territories.length > 0 && territories.some(t => t.image)) {
-      get().saveToBackend().catch(console.error);
-    }
+
   },
 
   updateGpx: (gpx) => {
@@ -56,9 +74,7 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
     };
     set({ cache: newCache });
 
-    if (gpx && gpx.trim() !== '') {
-      get().saveToBackend().catch(console.error);
-    }
+
   },
   updateTerritoryLayers: async (num: string, layers: PaintLayer[], isLarge: boolean = false) => {
     const prev = get().cache;
@@ -84,17 +100,7 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
     };
     set({ cache: newCache });
 
-    // Sauvegarder automatiquement via l'API complète
-    const updatedTerritory = updatedTerritories.find(t => t.num === num);
-    if (updatedTerritory) {
-      try {
-        console.log(`🎨 Sauvegarde des couches de peinture pour le territoire ${num} (${isLarge ? 'large' : 'standard'})`);
-        await apiService.updateTerritoryComplete(updatedTerritory);
-        console.log(`✅ Couches de peinture du territoire ${num} sauvegardées avec succès`);
-      } catch (error) {
-        console.error(`❌ Erreur lors de la sauvegarde des couches du territoire ${num}:`, error);
-      }
-    }
+
   },
   updateTerritory: async (num: string, updates: Partial<Territory>) => {
     const prev = get().cache;
@@ -135,16 +141,15 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
   },
 
   saveTerritoryStandard: async (num: string) => {
+    const apiService = new ApiTerritoryService();
     const cache = get().cache;
     if (!cache) {
-      console.error('❌ saveTerritoryStandard: Pas de cache disponible');
-      return;
+      throw new Error('Territoires non chargés');
     }
 
     const territory = cache.territories.find(t => t.num === num);
     if (!territory) {
-      console.error(`❌ saveTerritoryStandard: Territoire ${num} non trouvé`);
-      return;
+      throw new Error('Territoire introuvable');
     }
 
     try {
@@ -171,16 +176,15 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
   },
 
   saveTerritoryLarge: async (num: string) => {
+    const apiService = new ApiTerritoryService();
     const cache = get().cache;
     if (!cache) {
-      console.error('❌ saveTerritoryLarge: Pas de cache disponible');
-      return;
+      throw new Error('Territoires non chargés');
     }
 
     const territory = cache.territories.find(t => t.num === num);
     if (!territory) {
-      console.error(`❌ saveTerritoryLarge: Territoire ${num} non trouvé`);
-      return;
+      throw new Error('Territoire introuvable');
     }
 
     try {
@@ -208,22 +212,24 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
   },
 
   clearCache: () => {
-    set({ cache: null });
+    set({ cache: null, loading: true });
   },
 
   initialize: async () => {
+    const scope = getAccountScope();
     set({ loading: true });
     try {
       await get().loadFromBackend();
     } catch (error) {
       console.warn('Erreur lors du chargement depuis le backend:', error);
       // En cas d'erreur, on repart avec un cache vide
-      set({ cache: null });
+      if (isAccountScopeCurrent(scope)) set({ cache: null });
     }
-    set({ loading: false });
+    if (isAccountScopeCurrent(scope)) set({ loading: false });
   },
 
   saveToBackend: async () => {
+    const apiService = new ApiTerritoryService();
     const cache = get().cache;
     if (!cache) {
       console.error('❌ saveToBackend: Pas de cache disponible');
@@ -244,6 +250,8 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
   },
 
   loadFromBackend: async () => {
+    const apiService = new ApiTerritoryService();
+    const scope = getAccountScope();
     try {
       // Récupérer les données de territoire de l'utilisateur
       const response = await apiService.getTerritoryData();
@@ -273,11 +281,13 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
             lastUpdate: Date.now()
           };
 
+          if (!isAccountScopeCurrent(scope)) return;
           set({ cache });
           return;
         }
       }
     } catch (error) {
+      if (!isAccountScopeCurrent(scope)) return;
       console.error('Erreur lors du chargement des données depuis le backend:', error);
       // En cas d'erreur, conserver le cache existant si disponible
       const existingCache = get().cache;
@@ -286,13 +296,18 @@ export const useApiTerritoryStore = create<State>((set, get) => ({
       } else {
         console.warn('Utilisation du cache existant suite à une erreur de chargement');
       }
-      return;
+      throw error;
     }
-    set({ cache: null });
+    if (isAccountScopeCurrent(scope)) set({ cache: null });
   }
 }));
 
+useUser.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id) useApiTerritoryStore.getState().clearCache();
+});
+
 export const useApiTerritory = () => {
+  const scope = getAccountScope();
   const {
     cache,
     loading,
@@ -305,6 +320,7 @@ export const useApiTerritory = () => {
     saveTerritoryLarge,
     clearCache,
     initialize,
+    renameTerritory,
     saveToBackend,
     loadFromBackend
   } = useApiTerritoryStore();
@@ -315,15 +331,46 @@ export const useApiTerritory = () => {
   return {
     cache,
     loading,
-    setCache,
-    updateTerritories,
-    updateGpx,
-    updateTerritoryLayers,
-    updateTerritory,
-    saveTerritoryStandard,
-    saveTerritoryLarge,
-    clearCache,
-    saveToBackend,
-    loadFromBackend
+    renameTerritory: useCallback(async (...args: Parameters<typeof renameTerritory>) => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      return renameTerritory(...args);
+    }, [scope, renameTerritory]),
+    setCache: useCallback((...args: Parameters<typeof setCache>) => {
+      if (isAccountScopeCurrent(scope)) setCache(...args);
+    }, [scope, setCache]),
+    updateTerritories: useCallback((...args: Parameters<typeof updateTerritories>) => {
+      if (isAccountScopeCurrent(scope)) updateTerritories(...args);
+    }, [scope, updateTerritories]),
+    updateGpx: useCallback((...args: Parameters<typeof updateGpx>) => {
+      if (isAccountScopeCurrent(scope)) updateGpx(...args);
+    }, [scope, updateGpx]),
+    updateTerritoryLayers: useCallback((...args: Parameters<typeof updateTerritoryLayers>) => {
+      if (isAccountScopeCurrent(scope)) updateTerritoryLayers(...args);
+    }, [scope, updateTerritoryLayers]),
+    updateTerritory: useCallback((...args: Parameters<typeof updateTerritory>) => {
+      if (isAccountScopeCurrent(scope)) updateTerritory(...args);
+    }, [scope, updateTerritory]),
+    saveTerritoryStandard: useCallback(async (...args: Parameters<typeof saveTerritoryStandard>) => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      return saveTerritoryStandard(...args);
+    }, [scope, saveTerritoryStandard]),
+
+    saveTerritoryLarge: useCallback(async (...args: Parameters<typeof saveTerritoryLarge>) => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      return saveTerritoryLarge(...args);
+    }, [scope, saveTerritoryLarge]),
+
+    clearCache: useCallback((...args: Parameters<typeof clearCache>) => {
+      if (isAccountScopeCurrent(scope)) clearCache(...args);
+    }, [scope, clearCache]),
+    saveToBackend: useCallback(async (...args: Parameters<typeof saveToBackend>) => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      return saveToBackend(...args);
+    }, [scope, saveToBackend]),
+
+    loadFromBackend: useCallback(async (...args: Parameters<typeof loadFromBackend>) => {
+      if (!isAccountScopeCurrent(scope)) throw new Error('Account changed');
+      return loadFromBackend(...args);
+    }, [scope, loadFromBackend]),
   };
 };

@@ -1,42 +1,33 @@
 import { type FC, useEffect, useState } from 'react'
 import Wrapper from '#/ui/Wrapper'
 import { useTranslation } from 'react-i18next'
-import { handleGpxDownload, makeGpx } from '&/useFile'
+import { handleGpxDownload } from '&/useFile'
 import MapCard from '@/components/modules/MapCard'
 import Input from '@/components/ui/Input'
 import { Search } from 'lucide-react'
 import { useApiTerritory } from '@/hooks/useApiTerritory'
 import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
+import type { Territory } from '%/types'
 
 const Territories: FC = () => {
   const { t } = useTranslation()
-  const { cache, updateTerritories, updateGpx } = useApiTerritory()
+  const { cache, loading, renameTerritory } = useApiTerritory()
   const navigate = useNavigate()
   const [search, setSearch] = useState<string>("")
-  const [territorys, setTerritorys] = useState<any[]>([])
+  const [territorys, setTerritorys] = useState<Territory[]>([])
 
   useEffect(() => {
     if (cache?.territories?.length) {
       setTerritorys(cache.territories)
-    } else {
+    } else if (!loading) {
       navigate('/')
     }
-  }, [cache, navigate])
+  }, [cache, loading, navigate])
 
   const handleRename = async (num: string, name: string) => {
-    // Mise à jour locale immédiate pour la réactivité de l'UI
-    const updatedTerritorys = territorys.map(t => t.num === num ? { ...t, name } : t)
-    setTerritorys(updatedTerritorys)
-    updateTerritories(updatedTerritorys)
-
-    // Régénérer le GPX avec le nouveau nom et le sauvegarder en base
-    try {
-      const newGpx = makeGpx(updatedTerritorys)
-      updateGpx(newGpx) // Ceci déclenche automatiquement la sauvegarde en base
-      console.log(`✅ Nom du territoire ${num} sauvegardé en base: "${name}"`)
-    } catch (error) {
-      console.error(`❌ Erreur lors de la sauvegarde du GPX après renommage du territoire ${num}:`, error)
-    }
+    try { await renameTerritory(num, name) }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Sauvegarde impossible'); throw error }
   }
 
   return (
@@ -58,11 +49,11 @@ const Territories: FC = () => {
       <div className="flex flex-wrap gap-4 mt-8 pb-8 justify-center">
         {territorys
           .filter(t => !search || `${t.num} - ${t.name}`.toLowerCase().includes(search.toLowerCase()))
-          .map((territory, i) => (
+          .map((territory) => (
             <MapCard
               territory={territory}
               onRename={handleRename}
-              key={i}
+              key={territory.num}
               visible={!search ? true : `${territory.num} - ${territory.name}`.toLowerCase().includes(search.toLowerCase())}
             />
           ))}

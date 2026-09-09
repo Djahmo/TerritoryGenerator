@@ -68,10 +68,10 @@ Une application web moderne et complète pour la génération, l'annotation et l
 - **Frontend** : React 19 + TypeScript + Vite
 - **Styling** : UnoCSS avec thèmes sombre/clair
 - **State Management** : Zustand + hooks personnalisés
-- **Routing** : React Router v7
+- **Routing** : React Router v8
 - **Backend** : Fastify + Drizzle ORM + MySQL
 - **Authentification** : JWT avec sécurisation des routes
-- **Build** : Turbo (monorepo)
+- **Build** : Vite 8 + npm workspaces
 - **Cartographie** : Leaflet + OpenStreetMap
 
 ### Structure du projet
@@ -95,7 +95,7 @@ TerritoryGenerator/
 │       │   └── utils/        # Utilitaires backend
 │       └── public/          # Images générées
 ├── package.json           # Configuration workspace
-└── turbo.json            # Configuration Turbo
+└── package-lock.json      # Versions verrouillées des dépendances
 ```
 
 ### Base de données
@@ -118,8 +118,8 @@ TerritoryGenerator/
 ## 🚀 Installation et développement
 
 ### Prérequis
-- Node.js >= 18
-- npm >= 9
+- Node.js 24 LTS (`nvm use`)
+- npm >= 12
 
 ### Installation
 ```bash
@@ -127,8 +127,8 @@ TerritoryGenerator/
 git clone <repository-url>
 cd TerritoryGenerator
 
-# Installation des dépendances
-npm install
+# Installation reproductible des dépendances
+npm ci
 
 # Configuration de la base de données
 npm run drizzle:push

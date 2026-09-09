@@ -10,8 +10,7 @@ import {
   createPasswordResetToken,
   confirmUserEmail,
   getPasswordResetToken,
-  deletePasswordResetToken,
-  updateUserPassword,
+  resetPasswordWithToken,
   createSession,
   deleteSession
 } from '../db/index.js'
@@ -38,7 +37,7 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const parse = bodySchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     const { username, email, password } = parse.data
@@ -56,7 +55,7 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
     const hashed = await bcrypt.hash(password, 10)
     await createUser({ id, username, email, password: hashed })
 
-    const token = createToken(id, '30y')
+    const token = createToken(id, 'email-confirmation', '24h')
     const link = `${env.FRONTEND_URL}/auth/confirm?token=${token}`
 
     try {
@@ -77,7 +76,7 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const duration = 7
     const expiresAt = expiresAtTime(duration)
-    const sessionToken = createToken(id, `${duration}d`)
+    const sessionToken = createToken(id, 'session', `${duration}d`)
 
     await createSession(nanoid(), sessionToken, id, expiresAt)
 
@@ -92,13 +91,13 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
     })
     const parse = bodySchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     const { token } = parse.data
     let userId: string
     try {
-      const payload = verifyToken(token)
+      const payload = verifyToken(token, 'email-confirmation')
       userId = payload.userId
     } catch {
       return reply.status(400).send({ message: 'api.error.auth.invalidOrExpiredToken' })
@@ -108,13 +107,29 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
     if (!user) {
       return reply.status(404).send({ message: 'api.error.auth.userNotFound' })
     }
-    if (user.emailVerified) {
-      return reply.status(405).send({ message: 'api.error.auth.alreadyVerified' })
-    }
+    if (user.emailVerified) return reply.send({ ok: true })
 
     await confirmUserEmail(userId)
 
     return reply.send({ ok: true })
+  })
+
+  app.post('/auth/confirm/resend', async (request, reply) => {
+    const user = await getAuthUser(request)
+    if (!user) return reply.status(401).send({ message: 'api.error.auth.unauthorized' })
+    if (user.emailVerified) return reply.send({ ok: true })
+    const token = createToken(user.id, 'email-confirmation', '24h')
+    try {
+      await sendMailNoReply({
+        type: 'confirmation',
+        lang: request.headers['accept-language']?.slice(0, 2) || 'gb',
+        to: user.email,
+        data: { name: user.username, link: `${env.FRONTEND_URL}/auth/confirm?token=${token}` },
+      })
+      return reply.send({ ok: true })
+    } catch {
+      return reply.status(500).send({ message: 'api.error.auth.email.send' })
+    }
   })
 
   app.post('/auth/login', async (request, reply) => {
@@ -126,14 +141,14 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const parse = bodySchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     const { email, password, remember } = parse.data
 
     const user = await getUserByEmail(email)
 
-    if (!user) {
+    if (!user || user.disabled) {
       return reply.status(401).send({ message: 'api.error.auth.invalidCredentials' })
     }
 
@@ -144,7 +159,7 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const duration = remember ? 365 : 7
     const expiresAt = expiresAtTime(duration)
-    const sessionToken = createToken(user.id, `${duration}d`)
+    const sessionToken = createToken(user.id, 'session', `${duration}d`)
 
     await createSession(nanoid(), sessionToken, user.id, expiresAt)
 
@@ -178,15 +193,15 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const parse = bodySchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     const { email } = parse.data
     const user = await getUserByEmail(email)
 
-    if (!user) return reply.send({ ok: true })
+    if (!user || user.disabled) return reply.send({ ok: true })
 
-    const token = createToken(user.id, '1h')
+    const token = createToken(user.id, 'password-reset', '1h')
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60)
     await createPasswordResetToken({ email, token, expiresAt })
 
@@ -224,10 +239,16 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
 
     const parse = bodySchema.safeParse(request.body)
     if (!parse.success) {
-      return reply.status(400).send({ errors: parse.error.errors })
+      return reply.status(400).send({ errors: parse.error.issues })
     }
 
     const { token, password } = parse.data
+    let userId: string
+    try {
+      userId = verifyToken(token, 'password-reset').userId
+    } catch {
+      return reply.status(400).send({ message: 'api.error.auth.invalidOrExpiredToken' })
+    }
     const entry = await getPasswordResetToken(token)
 
     if (!entry || new Date(entry.expiresAt) < new Date()) {
@@ -235,13 +256,15 @@ export const registerAuthRoutes = (app: FastifyInstance) => {
     }
 
     const user = await getUserByEmail(entry.email)
-    if (!user) {
+    if (!user || user.disabled || user.id !== userId) {
       return reply.status(400).send({ message: 'api.error.auth.invalidOrExpiredToken' })
     }
 
     const hashed = await bcrypt.hash(password, 10)
-    await updateUserPassword(user.id, hashed)
-    await deletePasswordResetToken(token)
+    if (!await resetPasswordWithToken(token, user.id, hashed)) {
+      return reply.status(400).send({ message: 'api.error.auth.invalidOrExpiredToken' })
+    }
+    clearCookie(reply, 'sessionToken')
 
     return reply.send({ ok: true })
   })
