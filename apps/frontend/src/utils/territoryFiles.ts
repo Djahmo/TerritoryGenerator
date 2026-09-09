@@ -92,4 +92,5 @@ export const makeGpx = (territories: Territory[]): string => {
 }
 
 export const geometryChanged = (a: Territory, b: Territory) =>
-  JSON.stringify(a.polygon) !== JSON.stringify(b.polygon)
+  a.polygon.length !== b.polygon.length || a.polygon.some((point, index) =>
+    point.lat !== b.polygon[index].lat || point.lon !== b.polygon[index].lon)

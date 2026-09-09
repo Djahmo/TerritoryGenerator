@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { useNumericInput } from '../hooks/useNumericInput';
 
 interface NumericInputProps {
@@ -22,6 +22,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
   unit,
   className = ""
 }) => {
+  const id = useId();
   const handleSetValue = (newValue: number | ((prev: number) => number)) => {
     if (typeof newValue === 'function') {
       setValue(newValue(value));
@@ -34,11 +35,12 @@ export const NumericInput: React.FC<NumericInputProps> = ({
 
   return (
     <div className={`flex-1 ${className}`}>
-      <label className="block text-xs font-medium text-muted mb-1">
+      <label htmlFor={id} className="block text-xs font-medium text-muted mb-1">
         {label}
       </label>
       <div className="relative">
         <input
+          id={id}
           type="number"
           min={min}
           max={max}

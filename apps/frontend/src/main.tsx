@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import AppRouter from './router'
 import 'uno.css'
+import './styles/app.css'
 import { StrictMode } from 'react'
 import 'µ/i18n'
 import '@fontsource-variable/inter/index.css'

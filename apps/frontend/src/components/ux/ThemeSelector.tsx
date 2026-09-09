@@ -1,32 +1,9 @@
-import { useEffect, useState } from "react"
 import { useTheme } from '&/useTheme'
 import { Sun, Moon } from 'lucide-react'
-
-const ThemeSelector = () => {
-
-  const [darkMode, setDarkMode] = useState(false)
-
-  useEffect(() => {
-    const current = document.documentElement.classList.contains('dark')
-    setDarkMode(current)
-  }, [])
-
-
-  const toggleTheme = () => {
-    const html = document.documentElement
-    const isDark = html.classList.toggle('dark')
-    const newTheme = isDark ? 'dark' : 'light'
-    useTheme.getState().setTheme(newTheme)
-  }
-
-  return (
-    <button
-      onClick={toggleTheme}
-      className="btn p-2 rounded hover:text-positive transition"
-    >
-      {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-    </button>
-  )
+export default function ThemeSelector() {
+  const { theme, setTheme } = useTheme()
+  const label = theme === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre'
+  return <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="icon-button" aria-label={label} title={label}>
+    {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+  </button>
 }
-
-export default ThemeSelector

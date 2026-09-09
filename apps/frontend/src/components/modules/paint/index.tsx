@@ -8,7 +8,7 @@ import { ToolBar, ColorPickers, ActionButtons, NumericInput } from './components
 import { drawPreviewShape, drawCursorPreview, renderCanvas } from './utils/previewUtils';
 import { moveObjects } from './utils/dragUtils';
 import { isPointInSelectionBounds } from './utils/selectionUtils';
-import { calculateMinZoom, mouseToWorld, worldToScreen as canvasWorldToScreen, CanvasTransformParams } from './utils/canvasUtils';
+import { mouseToWorld, worldToScreen as canvasWorldToScreen, CanvasTransformParams } from './utils/canvasUtils';
 import { createToolShape, updateToolShape, drawToolShape } from './utils/toolFactory';
 import {
   SelectionTool,
@@ -155,21 +155,10 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
       setImg(img);
 
       const containerRect = container.getBoundingClientRect();
-      const canvasWidth = containerRect.width;      let canvasHeight, zoomMin;
-
-      // Traiter les images carrées comme des images verticales
-      if ((img.height > 700 && img.height > img.width) || (img.height === img.width)) {
-        // Image verticale OU carrée - limiter la hauteur à 700px
-        canvasHeight = 700;
-        const heightRatio = img.height / 700;
-        const adjustedImgWidth = img.width / heightRatio;
-        zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
-      } else {
-        // Image horizontale - adapter la hauteur selon le ratio
-        const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
-        canvasHeight = Math.min(calculatedHeight, 700);
-        zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
-      }
+      const canvasWidth = containerRect.width;
+      const maxHeight = window.innerWidth < 768 ? Math.max(280, Math.min(480, window.innerHeight * 0.5)) : 700;
+      const canvasHeight = Math.min(Math.round(canvasWidth * img.height / img.width), maxHeight);
+      const zoomMin = Math.min(canvasWidth / img.width, canvasHeight / img.height);
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -222,21 +211,10 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
 
       const containerRect = container.getBoundingClientRect();
       const canvasWidth = containerRect.width;
-      let canvasHeight;
-
-      if (backgroundImageRef.current) {
-        const img = backgroundImageRef.current;
-
-        if (img.height > 700 && img.height > img.width) {
-          canvasHeight = 700;
-        } else {
-          const calculatedHeight = Math.round((canvasWidth * img.height) / img.width);
-          canvasHeight = Math.min(calculatedHeight, 700);
-        }
-      } else {
-        const calculatedHeight = Math.round(canvasWidth * 0.75);
-        canvasHeight = Math.min(calculatedHeight, 700);
-      }
+      const img = backgroundImageRef.current;
+      const maxHeight = window.innerWidth < 768 ? Math.max(280, Math.min(480, window.innerHeight * 0.5)) : 700;
+      const canvasHeight = Math.min(Math.round(canvasWidth * (img ? img.height / img.width : 0.75)), maxHeight);
+      if (canvas.width === Math.trunc(canvasWidth) && canvas.height === canvasHeight) return;
 
       setCanvasDims({ w: canvasWidth, h: canvasHeight });
       canvas.width = canvasWidth;
@@ -247,28 +225,15 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
 
       if (backgroundImageRef.current) {
         const img = backgroundImageRef.current;
-        let zoomMin;
-
-        if (img.height > 700 && img.height > img.width) {
-          const heightRatio = img.height / 700;
-          const adjustedImgWidth = img.width / heightRatio;
-          zoomMin = Math.min(canvasWidth / adjustedImgWidth, 700 / img.height);
-        } else {
-          zoomMin = calculateMinZoom(img, { w: canvasWidth, h: canvasHeight });
-        }
+        const zoomMin = Math.min(canvasWidth / img.width, canvasHeight / img.height);
 
         setZoomMin(zoomMin);
 
-        if (zoom < zoomMin) {
-          setZoom(zoomMin);
-          const scaledImgWidth = img.width * zoomMin;
-          const scaledImgHeight = img.height * zoomMin;
-
-          setOffset({
-            x: (canvasWidth - scaledImgWidth) / 2,
-            y: (canvasHeight - scaledImgHeight) / 2
-          });
-        }
+        setZoom(zoomMin);
+        setOffset({
+          x: (canvasWidth - img.width * zoomMin) / 2,
+          y: (canvasHeight - img.height * zoomMin) / 2
+        });
       } else {
         setZoom(1);
         setZoomMin(1);
@@ -277,9 +242,11 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
     };
 
     window.addEventListener('resize', handleResize);
+    const observer = new ResizeObserver(handleResize);
+    if (containerRef.current) observer.observe(containerRef.current);
     handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, [setZoom, setZoomMin, setOffset, setCanvasDims, zoom]);
+    return () => { observer.disconnect(); window.removeEventListener('resize', handleResize); };
+  }, [setZoom, setZoomMin, setOffset, setCanvasDims]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -674,9 +641,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
   }, [showTextInput, saving, canUndo, canRedo, handleUndo, handleRedo, selectedObjects, handleClear, setSelectedObjects, setSelectedTool]);
 
   return (
-    <div className="flex w-full h-full min-w-0 relative" data-testid="paint">
+    <div className="paint-workspace" data-testid="paint">
       {saving && <div className="absolute inset-0 z-50 bg-black/30 flex items-center justify-center text-white">Sauvegarde…</div> }
-      <div className="flex-1 flex flex-col relative min-w-0">
+      <div className="paint-surface">
         <div ref={containerRef} className="flex-1 relative overflow-hidden">
           <canvas
             ref={canvasRef}
@@ -719,8 +686,9 @@ const Paint: React.FC<PaintProps> = ({ src, layers, onSave, onChange, dirty = fa
         </div>
       </div>
 
-      <div className="w-50 min-w-50 p-4 flex flex-col justify-between flex-shrink-0">
+      <div className="paint-sidebar">
         <div className='space-y-4'>
+          <p className="eyebrow">Outils de dessin</p>
           <ToolBar
             tools={TOOLS}
             selectedTool={selectedTool}

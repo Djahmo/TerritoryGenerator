@@ -1,5 +1,5 @@
 import { LucideProps } from "lucide-react";
-import { ForwardRefExoticComponent, RefAttributes, useState } from "react";
+import { ForwardRefExoticComponent, RefAttributes, useId, useState } from "react";
 import { BadgeAlert, BadgeCheck, Eye, EyeClosed } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ interface InputProps {
 const Input = ({ label, name, placeholder, className, min, max, step, type, value, onChange, onBlur, onWheel, disabled, autocomplete, verified, Icon }: InputProps) => {
 
   const { t } = useTranslation();
+  const id = useId();
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -90,14 +91,16 @@ const Input = ({ label, name, placeholder, className, min, max, step, type, valu
   }
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      {label && <label className="mb-2 text-sm font-medium">{label}</label>}
-      <div className={`border-b relative ${conditions.length > 0 && "mb-2"} ${visibleCondition ? " border-positive" : "border-positive/50"} `}>
+    <div className={`ui-field flex flex-col ${className || ""}`}>
+      {label && <label htmlFor={id} className="mb-2 text-sm font-medium">{label}</label>}
+      <div className="input-shell">
         {!!Icon && <Icon size={20} className="absolute ml-2 mt-2 text-positive" />}
         <input
           type={showPassword ? "text" : type}
+          id={id}
+          aria-label={label ? undefined : placeholder}
           name={name}
-          placeholder={!visibleCondition ? placeholder : ''}
+          placeholder={placeholder}
           value={value}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -105,7 +108,7 @@ const Input = ({ label, name, placeholder, className, min, max, step, type, valu
           onWheel={onWheel}
           disabled={disabled}
           autoComplete={autocomplete}
-          className={"w-full p-2 pb-1 outline-0" + (Icon ? " pl-10" : "")}
+          className={"w-full p-2 outline-0" + (Icon ? " pl-10" : "") + (type === "password" ? " pr-10" : "")}
           min={type === "number" ? min : undefined}
           max={type === "number" ? max : undefined}
           step={type === "number" ? step : undefined}
@@ -113,6 +116,7 @@ const Input = ({ label, name, placeholder, className, min, max, step, type, valu
         {type === "password" && (
           <button
             type="button"
+            aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
             className="absolute right-2 top-2 text-positive cursor-pointer"
             onClick={() => setShowPassword(prev => !prev)}
           >

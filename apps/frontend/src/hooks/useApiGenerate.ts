@@ -1,6 +1,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import type { Territory } from '%/types'
 import { ApiTerritoryService } from '../services/apiTerritoryService'
+import { planGeneration, type GenerationOptions } from '../services/generationPlan'
+import { draftKey, useDrawingDrafts } from '../services/drawingDrafts'
 import { imageToDataUrl, loadImage } from '../services/imageService'
 
 export const useApiGenerate = () => {
@@ -11,27 +13,30 @@ export const useApiGenerate = () => {
   const run = useRef(0)
   useEffect(() => () => { run.current++ }, [])
 
-  const generateImages = useCallback(async (territories: Territory[], callback: (territories: Territory[]) => void) => {
+  const generateImages = useCallback(async (territories: Territory[], callback: (territories: Territory[]) => void, options: GenerationOptions = {}) => {
     const currentRun = ++run.current
     setLoading(true)
     setError(null)
     try {
       const existing = await api.getTerritories()
-      const complete = new Set(existing.filter(t => t.image && t.miniature).map(t => t.num))
-      const pending = territories.filter(t => !complete.has(t.num))
+      const pending = planGeneration(territories, existing, options)
       setProgress({ current: 0, total: pending.length })
       const failed: string[] = []
       // The server already serializes IGN requests. Avoid filling its queue with retries.
-      for (const [index, territory] of pending.entries()) {
+      for (const [index, { territory, format }] of pending.entries()) {
         if (currentRun !== run.current) return
-        try { await api.generateStandardImage(territory) }
-        catch { failed.push(territory.num) }
+        const key = draftKey(territory.num, format === 'large')
+        try {
+          if (format === 'large') await api.generateLargeImage(territory)
+          else await api.generateStandardImage(territory)
+          useDrawingDrafts.getState().clearDraft(key)
+        } catch { failed.push(`${territory.num} (${format === 'large' ? 'large' : 'serré'})`) }
         if (currentRun !== run.current) return
         setProgress({ current: index + 1, total: pending.length })
       }
       if (currentRun !== run.current) return
       callback(await api.getTerritories())
-      if (failed.length) setError(`Génération échouée pour : ${failed.join(', ')}. Réimportez le fichier pour réessayer les cartes manquantes.`)
+      if (failed.length) setError(`Génération échouée pour : ${failed.join(', ')}. Réimportez le fichier pour relancer la génération choisie.`)
     } catch (err) {
       if (currentRun === run.current) setError(err instanceof Error ? err.message : 'Génération impossible')
     } finally {

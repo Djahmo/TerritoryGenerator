@@ -2,41 +2,9 @@ import { test, expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { readFile } from 'node:fs/promises'
 import { makeGpx } from '../src/utils/territoryFiles'
+import { setup } from './fixtures'
 
 const polygon = [{ lat: 48, lon: 2 }, { lat: 49, lon: 2 }, { lat: 48, lon: 3 }]
-async function setup(page: Page) {
-  const state = { writes: [] as { url: string; body: Record<string, unknown> }[], failSave: false }
-  await page.route('**/api/**', async route => {
-    const path = new URL(route.request().url()).pathname
-    if (route.request().method() !== 'GET') {
-      state.writes.push({ url: path, body: route.request().postDataJSON() })
-      return route.fulfill({ status: state.failSave ? 500 : 200, json: state.failSave ? { error: 'Offline' } : { success: true } })
-    }
-    if (path === '/api/me') return route.fulfill({ json: { id: 'alice', username: 'Alice', email: 'alice@example.test', emailVerified: '2025-01-01' } })
-    if (path === '/api/user-config') return route.fulfill({ json: { success: true, config: { contourColor: '#000', palette: ['#000000'], ppp: 300, ratioX: 1, ratioY: 1.41 } } })
-    if (path === '/api/data') return route.fulfill({ json: { success: true, data: { data: makeGpx([{ num: '1', name: 'Centre', polygon }, { num: '2', name: 'Sud', polygon }]) } } })
-    if (path === '/api/territories') {
-      // Generate real raster fixtures in the browser, without native canvas dependencies.
-      const image = await page.evaluate(() => {
-        const canvas = document.createElement('canvas'); canvas.width = 600; canvas.height = 800
-        const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 600, 800)
-        return canvas.toDataURL()
-      })
-      const wide = await page.evaluate(() => {
-        const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 500
-        const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#eee'; ctx.fillRect(0, 0, 800, 500)
-        return canvas.toDataURL()
-      })
-      return route.fulfill({ json: { success: true, territories: [
-        { num: '1', name: 'Centre <script>bad()</script>', polygon, original: image, image, miniature: image, originalLarge: wide, large: wide, paintLayersImage: [], paintLayersLarge: [] },
-        { num: '2', name: 'Sud', polygon, original: wide, image: wide, miniature: wide, paintLayersImage: [], paintLayersLarge: [] },
-      ] } })
-    }
-    return route.fulfill({ status: 404, json: {} })
-  })
-  await page.route('**/tiles/**', route => route.abort())
-  return state
-}
 async function draw(page: Page) {
   const canvas = page.locator('[data-testid="paint"] canvas')
   await expect(page.getByRole('button', { name: 'Sauvegarder', exact: true })).toBeEnabled()
@@ -154,4 +122,65 @@ test('regeneration confirms annotation removal and keeps the other format draft'
   await page.getByRole('button', { name: 'Régénérer le plan large', exact: true }).click()
   await expect(page.getByText('Fond de carte mis à jour', { exact: true })).toBeVisible()
   expect(await drafts(page)).toEqual(standard)
+})
+
+const sameCsv = { name: 'territoires.csv', mimeType: 'text/csv', buffer: Buffer.from('Category,Number,Suffix,Boundary\nCentre,1,,"[[2,48],[2,49],[3,48]]"\nSud,2,,"[[2,48],[2,49],[3,48]]"') }
+const generatedFormats = (state: Awaited<ReturnType<typeof setup>>) => state.writes.filter(write => write.url === '/api/generate-image').map(write => `${(write.body.territory as { num: string }).num}:${write.body.imageType}`)
+
+test('reimporting the same CSV regenerates every standard image and existing large plan each time', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/')
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByRole('button', { name: /Re téléverser/ }).click()
+    await expect(page.getByRole('checkbox', { name: 'Régénérer toutes les cartes' })).toBeChecked()
+    page.once('dialog', dialog => { expect(dialog.message()).toContain('annotations'); return dialog.accept() })
+    await page.locator('input[type=file]').setInputFiles(sameCsv)
+    await expect.poll(() => generatedFormats(state)).toEqual(Array.from({ length: attempt + 1 }, () => ['1:standard', '1:large', '2:standard']).flat())
+    await expect(page.getByRole('button', { name: /Re téléverser/ })).toBeVisible()
+  }
+})
+
+test('unchecked regeneration preserves complete images on CSV reimport', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Re téléverser/ }).click()
+  await page.getByRole('checkbox', { name: 'Régénérer toutes les cartes' }).uncheck()
+  await page.locator('input[type=file]').setInputFiles(sameCsv)
+  await expect.poll(() => state.writes.map(write => write.url)).toEqual(['/api/data'])
+  await expect(page.getByRole('button', { name: /Re téléverser/ })).toBeVisible()
+})
+
+test('canceling regeneration leaves the imported data and images untouched', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Re téléverser/ }).click()
+  const confirmation = page.waitForEvent('dialog')
+  await page.locator('input[type=file]').setInputFiles(sameCsv)
+  await (await confirmation).dismiss()
+  await expect(page.getByRole('button', { name: /Re téléverser/ })).toBeVisible()
+  expect(state.writes).toEqual([])
+})
+
+test('a failed image does not skip the rest of the CSV and retains only its draft', async ({ page }) => {
+  const state = await setup(page)
+  await page.goto('/territory/1')
+  await draw(page)
+  await page.getByRole('button', { name: 'Plan large', exact: true }).click()
+  await draw(page)
+  page.once('dialog', dialog => dialog.accept())
+  await page.goto('/')
+  await page.route('**/api/generate-image', async route => {
+    const body = route.request().postDataJSON()
+    if (body.territory.num === '1' && body.imageType === 'standard') {
+      state.writes.push({ url: '/api/generate-image', body })
+      return route.fulfill({ status: 503, json: { error: 'IGN unavailable' } })
+    }
+    return route.fallback()
+  })
+  await page.getByRole('button', { name: /Re téléverser/ }).click()
+  page.once('dialog', dialog => dialog.accept())
+  await page.locator('input[type=file]').setInputFiles(sameCsv)
+  await expect(page.getByRole('alert')).toContainText('1 (serré)')
+  expect(generatedFormats(state)).toEqual(['1:standard', '1:large', '2:standard'])
+  expect(Object.keys(await drafts(page))).toEqual([JSON.stringify(['alice', '1', false])])
 })

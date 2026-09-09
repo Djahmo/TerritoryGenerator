@@ -62,8 +62,9 @@
     },
     "ux": {
       "nav": {
-        "home": "My Territory",
-        "allTerritories": "All Territories",
+        "home": "Map overview",
+        "allTerritories": "My territories",
+        "exportation": "Print & export",
         "configuration": "Configuration"
       },
       "errorBoundary": {

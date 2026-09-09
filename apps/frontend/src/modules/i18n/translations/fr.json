@@ -62,8 +62,9 @@
     },
     "ux": {
       "nav": {
-        "home": "Mon territoire",
-        "allTerritories": "Tous les territoires",
+        "home": "Vue d’ensemble",
+        "allTerritories": "Mes territoires",
+        "exportation": "Impression & export",
         "configuration": "Configuration"
       },
       "errorBoundary": {

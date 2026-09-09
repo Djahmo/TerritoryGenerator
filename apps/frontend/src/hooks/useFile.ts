@@ -4,6 +4,7 @@ import type { Territory } from '%/types'
 
 export const useFileReader = () => {
   const sequence = useRef(0)
+  const [readId, setReadId] = useState(0)
   const [content, setContent] = useState('')
   const [type, setType] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -19,12 +20,12 @@ export const useFileReader = () => {
         text = new TextDecoder('windows-1252').decode(buffer)
       }
       if (!text.trim()) throw new Error('Le fichier est vide.')
-      setContent(text); setType(file.type || file.name.split('.').pop() || '')
+      setReadId(current); setContent(text); setType(file.type || file.name.split('.').pop() || '')
     }).catch(error => {
       if (current === sequence.current) setError(error instanceof Error ? error.message : 'Erreur de lecture du fichier')
     })
   }, [])
-  return { content, type, error, readFile }
+  return { content, type, error, readFile, readId }
 }
 export { parse, parseCsv, parseGpx, makeGpx } from '../utils/territoryFiles'
 export const handleGpxDownload = (territories: Territory[]) => {

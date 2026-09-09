@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -128,8 +129,11 @@ const Configuration = () => {
 
   if (!config) {
     return (
-      <Wrapper className='overflow-y-auto h-full'>
-        <div className="flex items-center justify-center h-full">
+      <Wrapper className="page">
+        <div className="empty-state welcome auth-welcome">
+          <img src="/images/logo.positive.png" alt="Territory Generator" />
+          <h1>Vos territoires. Vos repères.</h1>
+          <p>Connectez-vous pour retrouver vos cartes, personnaliser vos plans et préparer vos impressions.</p>
           <Auth />
         </div>
       </Wrapper>
@@ -137,61 +141,12 @@ const Configuration = () => {
   }
 
   return (
-    <Wrapper className='overflow-y-auto h-full'>
-      <div className="max-w-4xl mx-auto p-6 space-y-8">
-        <Auth />
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            {t('config.title', 'Configuration')}
-          </h1>
-          <p className="text-muted">
-            {t('config.subtitle', 'Paramètres avancés de l\'application')}
-          </p>
-        </div>
-
-        {/* Actions globales */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Actions</h2>          <div className="flex flex-wrap gap-4">
-            <button
-              onClick={handleExport}
-              className="btn-positive flex items-center gap-2"
-            >
-              <Download size={16} />
-              Exporter la configuration
-            </button>
-            <button
-              onClick={handleReset}
-              className="btn-negative flex items-center gap-2"
-            >
-              <RotateCcw size={16} />
-              Réinitialiser
-            </button>
-          </div>
-
-          <SeparatorX />
-
-          <div className="space-y-4">
-            <h3 className="font-medium">Importer une configuration</h3>
-            <Input
-              type="text"
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder="Collez votre configuration ici..."
-              className="font-mono text-sm"
-            />
-            <button
-              onClick={handleImport}
-              className="btn-accent flex items-center gap-2"
-            >
-              <Upload size={16} />
-              Importer
-            </button>
-          </div>
-        </div>
-
-        {/* Configuration du canvas/papier */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Canvas & Papier</h2>
+    <Wrapper className="page">
+      <div className="configuration-content">
+        <PageHeader eyebrow="À votre mesure" title={t('config.title', 'Configuration')} description="Ajustez vos formats, vos couleurs et les paramètres de génération de vos cartes." />
+        <div className="settings-account"><Auth /></div>
+        <div className="settings-card">
+          <h2 className="text-xl font-semibold mb-4">Formats & papier</h2>
 
           {/* PPP - Pleine largeur */}
           <div className="mb-6">
@@ -295,7 +250,7 @@ const Configuration = () => {
         </div>
 
         {/* Configuration des images */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
+        <div className="settings-card">
           <h2 className="text-xl font-semibold mb-4">Génération d'images</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
@@ -350,16 +305,19 @@ const Configuration = () => {
         </div>
 
         {/* Palette de couleurs */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
+        <div className="settings-card">
           <h2 className="text-xl font-semibold mb-4">Palette de couleurs</h2>
-          <div className="flex gap-6">
+          <div className="palette-editor">
             {/* Grille des couleurs */}
             <div className="flex-1">
-              <div className="grid grid-cols-5 gap-3">
+              <div className="palette-grid">
                 {config.palette.map((color, index) => (
-                  <div
+                  <button
+                    type="button"
+                    aria-label={`Remplacer la couleur ${index + 1}`}
+                    onClick={() => handlePaletteColorChange(index, selectedPaletteColor)}
                     key={`palette-${index}-${color}`}
-                    className="w-16 h-16 rounded border border-muted/50 cursor-pointer"
+                    className="palette-swatch"
                     style={{ backgroundColor: color }}
                     onContextMenu={(e) => {
                       e.preventDefault()
@@ -380,12 +338,12 @@ const Configuration = () => {
             </div>
           </div>
           <p className="text-sm text-muted mt-4">
-            Utilisez le sélecteur de couleurs à droite pour choisir une couleur, puis faites un clic droit sur une case de la grille pour la remplacer.
+            Choisissez une couleur avec le sélecteur, puis sélectionnez la case de la palette à remplacer.
           </p>
         </div>
 
         {/* Configuration API IGN */}
-        <div className="bg-lightnd dark:bg-darknd rounded-lg p-6">
+        <div className="settings-card">
           <h2 className="text-xl font-semibold mb-4">API IGN</h2>
           <div className="space-y-4">
             <div>
@@ -405,7 +363,7 @@ const Configuration = () => {
                 </button>
               )}
             </div>
-            <div className="flex flex-row gap-4">
+            <div className="settings-api-fields">
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Couche
@@ -415,8 +373,8 @@ const Configuration = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2">GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2</SelectItem>
-                    <SelectItem value="ORTHOIMAGERY.ORTHOPHOTOS">ORTHOIMAGERY.ORTHOPHOTOS</SelectItem>
+                    <SelectItem value="GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2">Plan IGN</SelectItem>
+                    <SelectItem value="ORTHOIMAGERY.ORTHOPHOTOS">Photographie aérienne</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -451,9 +409,49 @@ const Configuration = () => {
               </div>            </div>
           </div>
         </div>
+          {/* Actions globales */}
+        <div className="settings-card">
+          <h2 className="text-xl font-semibold mb-4">Sauvegarde de la configuration</h2>          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={handleExport}
+              className="btn-positive flex items-center gap-2"
+            >
+              <Download size={16} />
+              Exporter la configuration
+            </button>
+            <button
+              onClick={handleReset}
+              className="btn-negative flex items-center gap-2"
+            >
+              <RotateCcw size={16} />
+              Réinitialiser
+            </button>
+          </div>
+
+          <SeparatorX />
+
+          <div className="space-y-4">
+            <h3 className="font-medium">Importer une configuration</h3>
+            <Input
+              type="text"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder="Collez votre configuration ici..."
+              className="font-mono text-sm"
+            />
+            <button
+              onClick={handleImport}
+              className="btn-accent flex items-center gap-2"
+            >
+              <Upload size={16} />
+              Importer
+            </button>
+          </div>
+        </div>
+
       </div>      {/* Footer */}
       <footer className="py-3 border-t border-muted/20">
-        <div className="flex items-center justify-between text-sm text-muted">
+        <div className="flex flex-wrap gap-4 items-center justify-between text-xs text-muted">
           <div></div>
           <div className="text-center">
             <p>&copy; 2025 Territory Generator - Tous droits réservés</p>
@@ -476,7 +474,7 @@ const Configuration = () => {
               <Mail size={30} />
             </a>
           </div>
-        </div>
+      </div>
       </footer>
     </Wrapper>
   )

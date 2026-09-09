@@ -1,5 +1,5 @@
 import React from 'react';
-import { Undo, Redo, Trash2, Download } from 'lucide-react';
+import { Undo, Redo, Trash2, Save } from 'lucide-react';
 
 interface ActionButtonsProps {
   saving?: boolean;
@@ -18,7 +18,7 @@ interface ActionButtonsProps {
 
 export const ActionButtons: React.FC<ActionButtonsProps> = ({ saving, canSave, dirty, canUndo, canRedo, isLarge, selectedObjectsLength, onUndo, onRedo, onClear, onExport, onGoCrop }) => {
   return (
-    <div className="space-y-2">
+    <div className="paint-actions">
       {isLarge && <button
         onClick={onGoCrop}
         className="p-2 rounded border cursor-pointer w-full border-accent/50 hover:bg-accent/10 text-accent flex items-center justify-center"
@@ -56,10 +56,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({ saving, canSave, d
       <button
         disabled={saving || !canSave}
         onClick={onExport}
-        className="w-full p-2 rounded border cursor-pointer border-success text-success hover:bg-success-hover/20 flex items-center justify-center gap-1"
-        title="Exporter"
+        className="btn-accent w-full"
+        title="Sauvegarder le dessin"
       >
-        <Download size={16} />
+        <Save size={16} />
         <span className="text-sm">{saving ? "Sauvegarde…" : dirty ? "Sauvegarder les modifications" : "Sauvegarder"}</span>
       </button>
     </div>

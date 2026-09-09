@@ -1,69 +1,40 @@
-import type { Territory } from "%/types/"
-import { useTranslation } from "react-i18next"
-import { FC, useState, useEffect } from "react"
-import { Check } from "lucide-react"
-import { Link } from "react-router"
+import type { Territory } from '%/types/'
+import { useState } from 'react'
+import { Check, Pencil, ArrowUpRight, Map, X } from 'lucide-react'
+import { Link } from 'react-router'
 
-type MapCardProps = {
-  territory: Territory
-  onRename?: (num:string, name: string) => Promise<void>
-  visible?: boolean
-}
-
-const MapCard: FC<MapCardProps> = ({ territory, onRename, visible }) => {
-  const { t } = useTranslation()
+type MapCardProps = { territory: Territory; onRename?: (num: string, name: string) => Promise<void>; visible?: boolean }
+export default function MapCard({ territory, onRename, visible = true }: MapCardProps) {
   const { num, miniature, name } = territory
-
-  const [editMode, setEditMode] = useState(false)
-  const [inputName, setInputNom] = useState(name || "")
-
+  const [editing, setEditing] = useState(false)
+  const [inputName, setInputName] = useState(name || '')
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (!editMode) setInputNom(name || '') }, [name, editMode])
-
-  if (!miniature) return null
-
-  const handleValidate = async () => {
+  const validate = async () => {
     if (saving) return
     setSaving(true)
-    try { await onRename?.(num, inputName); setEditMode(false) }
-    catch { /* Keep the edited value so the user can retry. */ }
+    try { await onRename?.(num, inputName); setEditing(false) }
+    catch { /* Keep the edited value available for retry. */ }
     finally { setSaving(false) }
   }
-
-  return (
-    <div className=" relative bg-muted/60 border border-muted/50 rounded-lg shadow-xl hover:shadow-2xl p-0 w-90 flex flex-col items-center overflow-hidden cursor-pointer hover:scale-102 transition duration-100 ease-in-out"
-      style={{ display: !visible ? "none" : "flex" }}>
-      {!editMode ? (
-        <span
-          className="absolute top-3 left-3 bg-positive text-white text-xs px-3 py-1 rounded-full font-bold shadow-sm z-10 cursor-pointer hover:bg-positive-hover transition"
-          onClick={() => setEditMode(true)}
-          title={t("home.rename_territory", "Renommer le territoire")}
-        >
-          <span className="border-r pr-1 mr-1">{num}</span>{inputName}
-        </span>
-      ) : (
-        <div className="absolute top-3 left-3 w-[calc(100%-1.5rem)] flex items-center bg-positive rounded-full px-2 py-1 z-10 shadow gap-2">
-          <span className="pr-2 ml-1 text-white text-lg font-extralight cursor-default border-r">{num}</span>
-          <input
-            value={inputName}
-            onChange={e => setInputNom(e.target.value)}
-            className="flex-1 px-1 text-white font-bold outline-0"
-            placeholder={t("home.nom_placeholder", "Nom")}
-            onKeyDown={e => e.key === "Enter" && handleValidate()}
-            autoFocus
-          />
-          <button disabled={saving} onClick={handleValidate} className="ml-1 text-success hover:text-success-hover transition cursor-pointer">
-            <Check size={18} strokeWidth={3} />
-          </button>
-        </div>
-      )}      <Link to={"/territory/"+encodeURIComponent(num)} className="w-full from-gray-200 via-gray-100 to-white flex items-center justify-center relative overflow-hidden">        <img
-          src={miniature}
-          alt={`Territoire ${num}`}
-          className={`object-contain w-full h-full transition-opacity duration-300 `}
-        />
-      </Link>
+  if (!visible) return null
+  const href = `/territory/${encodeURIComponent(num)}`
+  const annotations = (territory.paintLayersImage?.length ?? 0) + (territory.paintLayersLarge?.length ?? 0)
+  return <article className="territory-card">
+    <Link to={href} className="card-preview" aria-label={`Ouvrir le territoire ${num}`}>
+      {miniature ? <img src={miniature} alt={`Plan du territoire ${num}`} loading="lazy" /> : <Map size={40} />}
+      <span className="card-number">N° {num}</span>
+    </Link>
+    <div className="card-body">
+      <div className="card-title-row">{editing ? <>
+        <input aria-label={`Nom du territoire ${num}`} value={inputName} disabled={saving} onChange={e => setInputName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') void validate(); if (e.key === 'Escape') setEditing(false) }} autoFocus />
+        <button className="icon-button" disabled={saving} onClick={validate} aria-label="Enregistrer le nom"><Check size={16} /></button>
+        <button className="icon-button" disabled={saving} onClick={() => setEditing(false)} aria-label="Annuler le renommage"><X size={16} /></button>
+      </> : <><h2 title={name || `Territoire ${num}`}><Link to={href}>{name || `Territoire ${num}`}</Link></h2>
+        {onRename && <button className="icon-button" onClick={() => { setInputName(name || ''); setEditing(true) }} aria-label={`Renommer le territoire ${num}`} title="Renommer"><Pencil size={14} /></button>}</>}
+      </div>
+      <p className="card-meta">{miniature ? territory.large ? 'Plan serré et plan large' : 'Plan serré' : 'Carte à générer'}</p>
+      <div className="card-footer"><span className="status-chip">{annotations ? `${annotations} annotation${annotations > 1 ? 's' : ''}` : 'Sans annotation'}</span><Link to={href} className="card-open">Ouvrir le plan<ArrowUpRight size={15} /></Link></div>
     </div>
-  )
+  </article>
 }
-
-export default MapCard

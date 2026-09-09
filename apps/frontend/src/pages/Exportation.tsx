@@ -1,3 +1,5 @@
+import { Printer, Download, Image, Search } from 'lucide-react'
+import PageHeader from '@/components/ui/PageHeader'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import JSZip from 'jszip'
@@ -56,32 +58,33 @@ export default function Exportation() {
     if (!isAccountScopeCurrent(scope)) throw new Error('Compte modifié')
     downloadBlob(blob, `${imagesOnly ? 'images' : 'impression'}_territoires.zip`)
   })
-  return <Wrapper className="h-full overflow-y-auto p-6">
-    <h1 className="text-2xl font-bold mb-6">Exportation ({territories.length} territoires)</h1>
+  return <Wrapper className="page">
+    <PageHeader eyebrow="Du terrain au papier" title="Impression & export" description="Préparez vos cartes pour le terrain ou emportez vos fichiers hors connexion." />
     <Loader enabled={loading} />
-    {!loading && !territories.length ? <p>Aucun territoire à exporter. <Link to="/">Importer des territoires</Link></p> : <>
-      <Input value={search} onChange={e => setSearch(e.target.value)} type="search" placeholder="Rechercher par nom ou numéro" />
-      <p className="my-3">Les actions groupées concernent les {filtered.length} territoires affichés.</p>
-      <div className="flex flex-wrap gap-3 mb-6">
-        <button className="btn-accent" disabled={busy || !filtered.length} onClick={() => print(filtered)}>Imprimer les territoires affichés</button>
-        <button className="btn-neutral" disabled={busy || !filtered.length} onClick={() => download(false)}>Télécharger fichiers d’impression</button>
-        <button className="btn-neutral" disabled={busy || !filtered.length} onClick={() => download(true)}>Télécharger les images ZIP</button>
+    {!loading && !territories.length ? <div className="empty-state"><Printer size={32} /><h2>Aucun territoire à exporter</h2><p>Importez vos territoires pour préparer vos premiers plans.</p><Link className="btn-positive" to="/">Importer des territoires</Link></div> : <>
+      <div className="collection-toolbar"><Input className="collection-search" value={search} onChange={e => setSearch(e.target.value)} type="search" Icon={Search} placeholder="Rechercher par nom ou numéro" /><span className="result-count">{filtered.length} territoire{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''}</span></div>
+      <div className="export-banner"><Printer size={30} /><div><h2>Prêts pour l’impression</h2><p>Les actions groupées concernent les {filtered.length} territoires affichés.</p></div>
+        <button className="btn-accent" disabled={busy || !filtered.length} onClick={() => print(filtered)}><Printer size={16} />Imprimer les territoires affichés</button>
+      </div>
+      <div className="export-downloads">
+        <button className="btn-neutral" disabled={busy || !filtered.length} onClick={() => download(false)}><Download size={16} />Télécharger fichiers d’impression</button>
+        <button className="btn-neutral" disabled={busy || !filtered.length} onClick={() => download(true)}><Image size={16} />Télécharger les images ZIP</button>
       </div>
       {busy && <p role="status">Préparation des cartes…</p>}
       {!filtered.length && <p>Aucun territoire ne correspond à cette recherche.</p>}
-      <div className="grid gap-4">{filtered.map(territory => <div key={territory.num} className="bg-lightnd dark:bg-darknd rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
-        <Link to={`/territory/${encodeURIComponent(territory.num)}`} className="flex items-center gap-4">
+      <div className="grid gap-4">{filtered.map(territory => <div key={territory.num} className="export-row">
+        <Link to={`/territory/${encodeURIComponent(territory.num)}`} className="export-territory">
           {territory.miniature && <img src={territory.miniature} alt="" className="w-16 h-16 object-contain" />}
-          <span>Territoire {territory.num} — {territory.name}</span>
+          <span><small>Territoire {territory.num}</small><strong>{territory.name || "Sans nom"}</strong></span>
         </Link>
-        <div className="flex flex-wrap gap-2">
+        <div className="export-formats">
           <button className="btn-neutral" disabled={busy} onClick={() => showPreview(territory)}>Aperçu</button>
           <button className="btn-accent" disabled={busy} onClick={() => print([territory])}>Imprimer</button>
           {territory.large && <><button className="btn-neutral" disabled={busy} onClick={() => showPreview(territory, true)}>Aperçu large</button><button className="btn-positive" disabled={busy} onClick={() => print([territory], true)}>Imprimer large</button></>}
         </div>
       </div>)}</div>
     </>}
-    <Modal isOpen={!!preview} onClose={() => setPreview(null)} className="w-[85vw] p-4 gap-3">
+    <Modal title="Aperçu d’impression" isOpen={!!preview} onClose={() => setPreview(null)} className="w-[85vw] p-4 gap-3">
       <div className="flex justify-between"><h2>Aperçu d’impression</h2><button className="btn-neutral" onClick={() => setPreview(null)}>Fermer</button></div>
       {preview && <><button className="btn-accent" onClick={() => {
         const target = window.open('', '_blank')

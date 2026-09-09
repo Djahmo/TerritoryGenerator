@@ -1,52 +1,18 @@
-import { FC, useRef, useCallback } from 'react'
+import { useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
-
-interface FileUploadProps {
-  onFile: (file: File) => void
-  accept?: string
-  loading?: boolean
+interface FileUploadProps { onFile: (file: File) => void; accept?: string; loading?: boolean }
+export default function FileUpload({ onFile, accept = '.csv,.gpx', loading }: FileUploadProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+  return <div className={`upload-zone ${dragging ? 'dragging' : ''}`}
+    onDragOver={e => { e.preventDefault(); if (!loading) setDragging(true) }}
+    onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false) }}
+    onDrop={e => { e.preventDefault(); setDragging(false); if (!loading && e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]) }}>
+    <Upload size={28} />
+    <button type="button" className="btn-accent" disabled={loading} onClick={() => inputRef.current?.click()}>{loading ? 'Chargement…' : 'Choisir un fichier'}</button>
+    <p>ou glissez votre fichier ici</p><span className="status-chip">{accept.split(',').map(format => format.replace('.', '').toUpperCase()).join(' · ')}</span>
+    <input ref={inputRef} aria-label="Fichier de territoires" type="file" disabled={loading} accept={accept} onChange={e => {
+      const file = e.target.files?.[0]; if (file && !loading) onFile(file); e.target.value = ''
+    }} />
+  </div>
 }
-
-const FileUpload: FC<FileUploadProps> = ({ onFile, accept = ".csv,.gpx", loading }) => {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && !loading) onFile(file)
-    e.target.value = ""
-  }, [onFile, loading])
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    if (!loading && e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
-  }, [onFile, loading])
-
-  return (
-    <div
-      className="flex flex-col items-center justify-center gap-2 w-full"
-      onDragOver={e => e.preventDefault()}
-      onDrop={handleDrop}
-    >
-      <label
-        htmlFor="territory-upload"
-        className="flex flex-col items-center justify-center cursor-pointer bg-muted/10 hover:bg-muted/20 text-sm text-muted rounded-lg border border-dashed border-muted/50 px-6 py-10 w-full text-center transition"
-      >
-        <Upload size={36} className="mb-2 text-primary" />
-        <span>
-          {loading ? "Chargement..." : "📁 Clique ou dépose un CSV ou GPX ici"}
-        </span>
-      </label>
-      <input
-        id="territory-upload"
-        type="file"
-        disabled={loading}
-        accept={accept}
-        onChange={handleFile}
-        className="hidden"
-        ref={inputRef}
-      />
-    </div>
-  )
-}
-
-export default FileUpload

@@ -1,4 +1,5 @@
-import { useParams, useNavigate, useSearchParams } from 'react-router'
+import { ArrowLeft, RefreshCw, MousePointer2 } from 'lucide-react'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Wrapper from '#/ui/Wrapper'
 import Input from '#/ui/Input'
@@ -88,17 +89,27 @@ export default function Territory() {
   }
   if (!territory) return <Wrapper className="p-6"><Loader enabled={loading} />{!loading && <p>Territoire introuvable.</p>}<button className="btn-neutral" onClick={() => navigate('/territories')}>Retour aux territoires</button></Wrapper>
   const src = isLarge ? territory.originalLarge : territory.original
-  return <Wrapper className="mt-4 px-4 pb-8 flex flex-col items-center gap-6 overflow-y-auto h-full">
-    <h1 className="text-3xl font-bold flex items-center gap-3"><span>{num}</span><Input value={name} onChange={e => setName(e.target.value)} onBlur={rename} type="text" placeholder="Nom du territoire" /></h1>
-    <div className="flex gap-3">
-      <button className="btn-neutral" disabled={busy} onClick={() => setParams(isLarge ? {} : { mode: 'large' })}>{isLarge ? 'Plan serré' : 'Plan large'}</button>
-      <button className="btn-neutral" disabled={busy} onClick={regenerate}>{src ? 'Régénérer' : 'Générer'} le plan {isLarge ? 'large' : 'serré'}</button>
+  return <Wrapper className="page editor-page">
+    <Link className="editor-breadcrumb" to="/territories"><ArrowLeft size={14} />Mes territoires</Link>
+    <p className="eyebrow">Atelier de dessin</p>
+    <div className="editor-heading">
+      <h1 className="editor-number">N° {num}</h1>
+      <Input value={name} onChange={e => setName(e.target.value)} onBlur={rename} type="text" placeholder="Nom du territoire" />
+      <span className={`status-chip ${draft ? 'has-draft' : ''}`} role="status">{draft ? 'Modifications à sauvegarder' : 'Aucune modification en attente'}</span>
     </div>
-    <div className="relative rounded-lg border border-muted/50 shadow-xl max-w-[90vw] md:max-w-[60vw] w-full">
+    <div className="editor-toolbar">
+      <div className="segmented-control" role="group" aria-label="Format du plan">
+        <button aria-pressed={!isLarge} disabled={busy} onClick={() => setParams({})}>Plan serré</button>
+        <button aria-pressed={isLarge} disabled={busy} onClick={() => setParams({ mode: 'large' })}>Plan large</button>
+      </div>
+      <button className="btn-neutral" disabled={busy} onClick={regenerate}><RefreshCw size={15} />{src ? 'Régénérer' : 'Générer'} le plan {isLarge ? 'large' : 'serré'}</button>
+    </div>
+    <div className="editor-frame">
       {src ? <Paint key={`${num}:${isLarge}:${revision}`} src={src} layers={draft?.layers ?? (isLarge ? territory.paintLayersLarge : territory.paintLayersImage) ?? []}
         onChange={onChange} dirty={!!draft} onSave={save} onCrop={crop} isLarge={isLarge} territoryPolygon={territory.polygon} territory={territory} />
         : <p className="p-8">Ce plan n’a pas encore été généré.</p>}
       {busy && <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center text-white" role="status">Traitement en cours…</div>}
     </div>
+    <p className="editor-hint"><MousePointer2 size={14} />Molette pour zoomer · Ctrl + glisser pour déplacer le plan · Sauvegardez pour retrouver vos annotations à l’impression.</p>
   </Wrapper>
 }

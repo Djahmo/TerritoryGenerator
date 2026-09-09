@@ -14,7 +14,7 @@ const LanguageSelector = () => {
 
   return (
     <Select value={lang} onValueChange={i18n.changeLanguage}>
-      <SelectTrigger className="w-20 justify-center">
+      <SelectTrigger aria-label="Langue de l’interface" className="w-20 justify-center">
         <img
           src={`/images/flags/${lang}.svg`}
           alt={lang}
